@@ -225,6 +225,27 @@
       "when": 1793366800000,
       "tag": "0031_staff_signup_metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1793366900000,
+      "tag": "0032_hierarchical_staff_approval",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1793367000000,
+      "tag": "0033_super_admin_owner_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1793367100000,
+      "tag": "0034_super_admin_profiles_access",
+      "breakpoints": true
     }
   ]
 }

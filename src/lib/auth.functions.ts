@@ -4,7 +4,6 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   admin, clientIp, lockoutMinutes, logAttempt, normalizePhone, origin, publicClient, recentCount, sha256, LIMITS,
 } from "./auth.server";
-import { MONIRAMPUR_STATIONS } from "./monirampur-stations";
 
 type Tokens = { access_token: string; refresh_token: string };
 type Result = { ok: true; tokens: Tokens } | { ok: false; error: string; lockedMinutes?: number };
@@ -52,129 +51,7 @@ export const passwordSignIn = createServerFn({ method: "POST" })
     return { ok: true, tokens: { access_token: s.session.access_token, refresh_token: s.session.refresh_token } };
   });
 
-/* ---------- Server-only fallback when the Supabase instance disables public signup ---------- */
-export const registerStaffWithAdminFallback = createServerFn({ method: "POST" })
-  .validator((d) => z.object({
-    name: z.string().trim().min(1).max(100),
-    contact: z.string().trim().max(255),
-    role: z.enum(["worker", "police", "admin"]),
-    unionId: z.string().min(1).max(64),
-    password: z.string().min(8).max(128).optional(),
-  }).parse(d))
-  .handler(async ({ data }) => {
-    const fieldRole = data.role === "worker" || data.role === "police";
-    const phone = fieldRole ? normalizePhone(data.contact) : null;
-    let email: string | null = null;
-    if (fieldRole && !phone) return { ok: false as const, error: "bad_phone" };
-    if (!fieldRole) {
-      const parsedEmail = z.string().trim().toLowerCase().email().max(255).safeParse(data.contact);
-      if (!parsedEmail.success || !data.password) return { ok: false as const, error: "bad_email" };
-      email = parsedEmail.data;
-    }
-    if (!MONIRAMPUR_STATIONS.some((station) => station.id === data.unionId && station.type === "union")) {
-      return { ok: false as const, error: "bad_union" };
-    }
-
-    const identifier = phone ? `phone:${phone}` : `email:${email ?? ""}`;
-    const ip = clientIp();
-    try {
-      const lock = await lockoutMinutes(identifier, ip);
-      if (lock) return { ok: false as const, error: "locked", lockedMinutes: lock };
-      if ((await recentCount(identifier, "signup", 60)) >= 3) {
-        return { ok: false as const, error: "too_many", lockedMinutes: 60 };
-      }
-
-      const dummyEmail = phone ? `${phone.replace(/\D/g, "")}@manirampur.gov.bd` : null;
-      const userMetadata = {
-        full_name: data.name,
-        role: data.role,
-        union_id: data.unionId,
-        upazila_id: "manirampur",
-        signup_name: data.name,
-        signup_role: data.role,
-        signup_union_id: data.unionId,
-        ...(phone ? { phone_number: phone, email: dummyEmail, dummy_email: dummyEmail } : {}),
-      };
-      const db = await admin();
-      const { data: created, error } = await db.auth.admin.createUser({
-        ...(phone ? { phone } : { email: email! }),
-        password: data.password ?? `${crypto.randomUUID()}${crypto.randomUUID()}`,
-        ...(phone ? {} : { email_confirm: false }),
-        user_metadata: userMetadata,
-      });
-      if (error || !created.user) {
-        const code = error?.code ?? "create_failed";
-        await logAttempt(identifier, "signup", ip, false, code);
-        console.error("Admin signup fallback failed", { code, message: error?.message });
-        if (code === "user_already_exists" || code === "email_exists" || code === "phone_exists") {
-          return { ok: false as const, error: "already_registered", message: error?.message };
-        }
-        return { ok: false as const, error: "registration_failed", message: error?.message ?? "Supabase returned no user" };
-      }
-
-      const { error: profileError } = await db.from("profiles").upsert({
-        id: created.user.id,
-        name_bn: data.name,
-        name_en: data.name,
-        mobile: phone,
-        email: email ?? dummyEmail,
-        upazila_id: "manirampur",
-        union_id: data.unionId,
-        ward: fieldRole ? 1 : null,
-        active: false,
-        status: "pending",
-      });
-      if (profileError) {
-        const { error: deleteError } = await db.auth.admin.deleteUser(created.user.id);
-        if (deleteError) console.error("Could not clean up signup after profile creation failed", deleteError.message);
-        await logAttempt(identifier, "signup", ip, false, "profile_failed");
-        console.error("Admin signup fallback profile creation failed", profileError.message);
-        return { ok: false as const, error: "registration_failed", message: profileError.message };
-      }
-
-      const { error: roleError } = await db.from("user_roles")
-        .upsert({ user_id: created.user.id, role: data.role }, { onConflict: "user_id,role" });
-      if (roleError) {
-        const { error: deleteError } = await db.auth.admin.deleteUser(created.user.id);
-        if (deleteError) console.error("Could not clean up signup after role creation failed", deleteError.message);
-        await logAttempt(identifier, "signup", ip, false, "role_failed");
-        console.error("Admin signup fallback role creation failed", roleError.message);
-        return { ok: false as const, error: "registration_failed", message: roleError.message };
-      }
-
-      if (email) {
-        const { error: resendError } = await publicClient().auth.resend({
-          type: "signup",
-          email,
-          options: { emailRedirectTo: origin() },
-        });
-        if (resendError) {
-          const { error: deleteError } = await db.auth.admin.deleteUser(created.user.id);
-          if (deleteError) console.error("Could not clean up unverified signup fallback user", deleteError.message);
-          await logAttempt(identifier, "signup", ip, false, "confirmation_email_failed");
-          console.error("Signup confirmation email failed", resendError.message);
-          return {
-            ok: false as const,
-            error: "confirmation_failed",
-            message: resendError.message,
-          };
-        }
-      }
-
-      await logAttempt(identifier, "signup", ip, true);
-      return { ok: true as const };
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause);
-      console.error("Admin signup fallback could not run", message);
-      return {
-        ok: false as const,
-        error: message.includes("SUPABASE_SERVICE_ROLE_KEY") ? "server_configuration" : "registration_failed",
-        message,
-      };
-    }
-  });
-
-/* ---------- Union-scoped account approval (UP Administrative Officer only) ---------- */
+/* ---------- Hierarchical staff account approval ---------- */
 export const listPendingStaff = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -187,27 +64,41 @@ export const listPendingStaff = createServerFn({ method: "GET" })
       console.error("Could not verify approval-management role", rolesError.message);
       return { ok: false as const, error: "unavailable" };
     }
-    if (!(roles ?? []).some((item) => item.role === "admin") || (roles ?? []).some((item) => item.role !== "admin")) {
+    const roleList = (roles ?? []).map((item) => item.role);
+    const isAdmin = roleList.length === 1 && roleList[0] === "admin";
+    const isUno = roleList.length === 1 && roleList[0] === "uno";
+    if (!isAdmin && !isUno) {
       return { ok: false as const, error: "forbidden" };
     }
 
     const db = await admin();
     const { data: officer, error: officerError } = await db.from("profiles")
-      .select("active, status, upazila_id, union_id").eq("id", context.userId).maybeSingle();
+      .select("active, status, approval_status, upazila_id, union_id, station_id").eq("id", context.userId).maybeSingle();
     if (officerError) {
       console.error("Could not load approval officer scope", officerError.message);
       return { ok: false as const, error: "unavailable" };
     }
-    if (!officer?.active || officer.status !== "active" || !officer.upazila_id || !officer.union_id) {
+    if (
+      !officer?.active ||
+      officer.status !== "active" ||
+      officer.approval_status !== "approved" ||
+      !officer.upazila_id ||
+      (isAdmin && (!officer.union_id || !officer.station_id))
+    ) {
       return { ok: false as const, error: "forbidden" };
     }
 
-    const { data: profiles, error: pendingError } = await db.from("profiles")
+    let pendingQuery = db.from("profiles")
       .select("id, name_bn, name_en, email, mobile, created_at")
-      .eq("status", "pending")
+      .eq("approval_status", "pending")
       .eq("upazila_id", officer.upazila_id)
-      .eq("union_id", officer.union_id)
       .order("created_at", { ascending: true });
+    if (isAdmin) {
+      pendingQuery = pendingQuery
+        .eq("station_id", officer.station_id!)
+        .eq("union_id", officer.union_id!);
+    }
+    const { data: profiles, error: pendingError } = await pendingQuery;
     if (pendingError) {
       console.error("Could not load pending staff registrations", pendingError.message);
       return { ok: false as const, error: "unavailable" };
@@ -223,6 +114,10 @@ export const listPendingStaff = createServerFn({ method: "GET" })
     const applicants = profiles.flatMap((profile) => {
       const role = applicantRoles?.find((item) => item.user_id === profile.id)?.role;
       if (role !== "worker" && role !== "police" && role !== "admin") return [];
+      if (
+        (isAdmin && role !== "worker" && role !== "police") ||
+        (isUno && role !== "admin")
+      ) return [];
       return [{
         id: profile.id,
         nameBn: profile.name_bn,
@@ -252,30 +147,59 @@ export const reviewStaffRegistration = createServerFn({ method: "POST" })
       console.error("Could not verify approval-management role", rolesError.message);
       return { ok: false as const, error: "unavailable" };
     }
-    if (!(roles ?? []).some((item) => item.role === "admin") || (roles ?? []).some((item) => item.role !== "admin")) {
+    const roleList = (roles ?? []).map((item) => item.role);
+    const isAdmin = roleList.length === 1 && roleList[0] === "admin";
+    const isUno = roleList.length === 1 && roleList[0] === "uno";
+    if (!isAdmin && !isUno) {
       return { ok: false as const, error: "forbidden" };
     }
 
     const db = await admin();
     const { data: officer, error: officerError } = await db.from("profiles")
-      .select("active, status, upazila_id, union_id").eq("id", context.userId).maybeSingle();
+      .select("active, status, approval_status, upazila_id, union_id, station_id").eq("id", context.userId).maybeSingle();
     if (officerError) {
       console.error("Could not load approval officer scope", officerError.message);
       return { ok: false as const, error: "unavailable" };
     }
-    if (!officer?.active || officer.status !== "active" || !officer.upazila_id || !officer.union_id) {
+    if (
+      !officer?.active ||
+      officer.status !== "active" ||
+      officer.approval_status !== "approved" ||
+      !officer.upazila_id ||
+      (isAdmin && (!officer.union_id || !officer.station_id))
+    ) {
       return { ok: false as const, error: "forbidden" };
     }
 
+    const { data: applicantRoleRows, error: applicantRoleError } = await db.from("user_roles")
+      .select("role").eq("user_id", data.userId);
+    if (applicantRoleError) {
+      console.error("Could not verify applicant role", applicantRoleError.message);
+      return { ok: false as const, error: "unavailable" };
+    }
+    const applicantRoles = (applicantRoleRows ?? []).map((item) => item.role);
+    const canReviewRole = isAdmin
+      ? applicantRoles.length === 1 && (applicantRoles[0] === "worker" || applicantRoles[0] === "police")
+      : applicantRoles.length === 1 && applicantRoles[0] === "admin";
+    if (!canReviewRole) return { ok: false as const, error: "not_pending_or_forbidden" };
+
     const status = data.decision === "approve" ? "active" : "rejected";
-    const { data: updated, error: updateError } = await db.from("profiles")
-      .update({ status, active: data.decision === "approve" })
+    let updateQuery = db.from("profiles")
+      .update({
+        approval_status: data.decision === "approve" ? "approved" : "rejected",
+        status,
+        active: data.decision === "approve",
+      })
       .eq("id", data.userId)
-      .eq("status", "pending")
+      .eq("approval_status", "pending")
       .eq("upazila_id", officer.upazila_id)
-      .eq("union_id", officer.union_id)
-      .select("id")
-      .maybeSingle();
+      .select("id");
+    if (isAdmin) {
+      updateQuery = updateQuery
+        .eq("station_id", officer.station_id!)
+        .eq("union_id", officer.union_id!);
+    }
+    const { data: updated, error: updateError } = await updateQuery.maybeSingle();
     if (updateError) {
       console.error("Could not update staff approval status", updateError.message);
       return { ok: false as const, error: "unavailable" };
@@ -397,7 +321,7 @@ export const bootstrapSuperAdmin = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
-/* ---------- Staff provisioning (Super Admin / UNO) ---------- */
+/* ---------- Staff provisioning (role-scoped, approval required) ---------- */
 export const createStaff = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d) => z.object({
@@ -411,21 +335,53 @@ export const createStaff = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const claims = context.claims as { aal?: string };
     if (claims.aal !== "aal2") return { ok: false as const, error: "mfa_required" };
-    const { data: myRoles } = await context.supabase.from("user_roles").select("role").eq("user_id", context.userId);
-    const roles = (myRoles ?? []).map((r) => r.role);
-    const isSuper = roles.includes("super");
-    if (!isSuper) {
-      if (!roles.includes("uno") || data.role === "uno") return { ok: false as const, error: "forbidden" };
-      const { data: me } = await context.supabase.from("profiles").select("upazila_id").eq("id", context.userId).single();
-      if (me?.upazila_id !== data.upazilaId) return { ok: false as const, error: "forbidden" };
+    const { data: myRoles, error: rolesError } = await context.supabase
+      .from("user_roles").select("role").eq("user_id", context.userId);
+    if (rolesError) {
+      console.error("Could not verify staff-provisioning role", rolesError.message);
+      return { ok: false as const, error: "unavailable" };
     }
+    const roles = (myRoles ?? []).map((r) => r.role);
+    const isSuper = roles.length === 1 && roles[0] === "super";
+    const isUno = roles.length === 1 && roles[0] === "uno";
     const fieldRole = data.role === "worker" || data.role === "police";
-    if (data.role !== "uno" && !data.unionId) return { ok: false as const, error: "union_required" };
+    if (!isSuper && !isUno) return { ok: false as const, error: "forbidden" };
+    if (isUno && data.role === "uno") return { ok: false as const, error: "forbidden" };
+
+    if (!isSuper) {
+      const { data: me, error: profileError } = await context.supabase
+        .from("profiles")
+        .select("active, status, approval_status, upazila_id, station_id")
+        .eq("id", context.userId)
+        .maybeSingle();
+      if (profileError) {
+        console.error("Could not load staff-provisioning officer", profileError.message);
+        return { ok: false as const, error: "unavailable" };
+      }
+      if (
+        !me?.active ||
+        me.status !== "active" ||
+        me.approval_status !== "approved" ||
+        me.upazila_id !== data.upazilaId
+      ) {
+        return { ok: false as const, error: "forbidden" };
+      }
+    }
+    if (data.role !== "uno" && !data.unionId) {
+      return { ok: false as const, error: "union_required" };
+    }
 
     const db = await admin();
-    const { data: up } = await db.from("upazilas").select("unions").eq("id", data.upazilaId).single();
+    const { data: up, error: upazilaError } = await db.from("upazilas")
+      .select("unions").eq("id", data.upazilaId).maybeSingle();
+    if (upazilaError) {
+      console.error("Could not validate staff upazila", upazilaError.message);
+      return { ok: false as const, error: "unavailable" };
+    }
     if (!up) return { ok: false as const, error: "bad_upazila" };
-    if (data.unionId && !(up.unions as { id: string }[]).some((u) => u.id === data.unionId)) return { ok: false as const, error: "bad_union" };
+    if (data.unionId && !(up.unions as { id: string }[]).some((u) => u.id === data.unionId)) {
+      return { ok: false as const, error: "bad_union" };
+    }
 
     let created;
     if (fieldRole) {
@@ -445,13 +401,45 @@ export const createStaff = createServerFn({ method: "POST" })
       mobile: fieldRole ? normalizePhone(data.contact) : null, email: fieldRole ? null : data.contact.toLowerCase(),
       upazila_id: data.upazilaId, union_id: data.role === "uno" ? null : data.unionId ?? null,
       ward: fieldRole ? data.ward ?? 1 : null,
+      active: data.role === "uno",
+      status: data.role === "uno" ? "active" : "pending",
+      approval_status: data.role === "uno" ? "approved" : "pending",
     });
-    if (pe) { await db.auth.admin.deleteUser(uid); return { ok: false as const, error: pe.message }; }
-    await db.from("user_roles").insert({ user_id: uid, role: data.role });
-    await db.from("audit_logs").insert({ user_id: context.userId, action: `staff:create:${data.role}`, details: { new_user: uid } });
-    // Officers set their own password via an expiring one-time link
-    if (!fieldRole) await publicClient().auth.resetPasswordForEmail(data.contact.toLowerCase(), { redirectTo: `${origin()}/reset-password` });
-    return { ok: true as const };
+    if (pe) {
+      const { error: cleanupError } = await db.auth.admin.deleteUser(uid);
+      if (cleanupError) console.error("Could not clean up staff account after profile creation failed", cleanupError.message);
+      console.error("Could not create staff profile", pe.message);
+      return { ok: false as const, error: "profile_failed" };
+    }
+    const { error: roleError } = await db.from("user_roles").insert({ user_id: uid, role: data.role });
+    if (roleError) {
+      const { error: cleanupError } = await db.auth.admin.deleteUser(uid);
+      if (cleanupError) console.error("Could not clean up staff account after role assignment failed", cleanupError.message);
+      console.error("Could not assign staff role", roleError.message);
+      return { ok: false as const, error: "role_failed" };
+    }
+    if (!fieldRole) {
+      const { error: resetError } = await publicClient().auth.resetPasswordForEmail(
+        data.contact.toLowerCase(),
+        { redirectTo: `${origin()}/reset-password` },
+      );
+      if (resetError) {
+        const { error: cleanupError } = await db.auth.admin.deleteUser(uid);
+        if (cleanupError) console.error("Could not clean up staff account after password setup email failed", cleanupError.message);
+        console.error("Could not send staff password setup email", resetError.message);
+        return { ok: false as const, error: "password_setup_failed" };
+      }
+    }
+    const { error: auditError } = await db.from("audit_logs").insert({
+      user_id: context.userId,
+      action: `staff:create:${data.role}`,
+      details: { new_user: uid, approval_status: data.role === "uno" ? "approved" : "pending" },
+    });
+    if (auditError) {
+      console.error("Staff account created but audit logging failed", auditError.message);
+      return { ok: true as const, warning: "audit_failed" };
+    }
+    return { ok: true as const, approvalStatus: data.role === "uno" ? "approved" as const : "pending" as const };
   });
 
 /* ---------- Recovery codes ---------- */

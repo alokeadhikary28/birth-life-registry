@@ -445,6 +445,7 @@ export type Database = {
       profiles: {
         Row: {
           active: boolean
+          approval_status: "pending" | "approved" | "rejected"
           created_at: string
           district_id: string | null
           email: string | null
@@ -460,6 +461,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          approval_status?: "pending" | "approved" | "rejected"
           created_at?: string
           district_id?: string | null
           email?: string | null
@@ -475,6 +477,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          approval_status?: "pending" | "approved" | "rejected"
           created_at?: string
           district_id?: string | null
           email?: string | null
@@ -844,7 +847,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "worker" | "admin" | "police" | "uno" | "super" | "district"
+      app_role: "worker" | "admin" | "police" | "uno" | "super" | "district" | "super_admin" | "owner"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -972,7 +975,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["worker", "admin", "police", "uno", "super", "district"],
+      app_role: ["worker", "admin", "police", "uno", "super", "district", "super_admin", "owner"],
     },
   },
 } as const

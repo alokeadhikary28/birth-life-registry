@@ -340,42 +340,42 @@ export type Database = {
           created_at: string
           full_name: string
           id: string
-          mobile: string
+          phone: string
           processing_at: string | null
           processing_by: string | null
-          requested_role: string
+          role: string
           reviewed_at: string | null
           reviewed_by: string | null
           status: string
-          union_id: string
+          union_name: string
           upazila_id: string
         }
         Insert: {
           created_at?: string
           full_name: string
           id?: string
-          mobile: string
+          phone: string
           processing_at?: string | null
           processing_by?: string | null
-          requested_role: string
+          role: string
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: string
-          union_id: string
+          union_name: string
           upazila_id: string
         }
         Update: {
           created_at?: string
           full_name?: string
           id?: string
-          mobile?: string
+          phone?: string
           processing_at?: string | null
           processing_by?: string | null
-          requested_role?: string
+          role?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: string
-          union_id?: string
+          union_name?: string
           upazila_id?: string
         }
         Relationships: [

@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   admin, clientIp, lockoutMinutes, logAttempt, normalizePhone, origin, publicClient, recentCount, sha256, LIMITS,
 } from "./auth.server";
+import { MONIRAMPUR_STATIONS } from "./monirampur-stations";
 
 type Tokens = { access_token: string; refresh_token: string };
 type Result = { ok: true; tokens: Tokens } | { ok: false; error: string; lockedMinutes?: number };
@@ -107,9 +108,9 @@ export const listPendingStaff = createServerFn({ method: "GET" })
     let registrationRequests: {
       id: string;
       full_name: string;
-      mobile: string;
-      requested_role: string;
-      union_id: string;
+      phone: string;
+      role: string;
+      union_name: string;
       created_at: string;
     }[] = [];
     if (isUno) {
@@ -125,7 +126,7 @@ export const listPendingStaff = createServerFn({ method: "GET" })
       }
 
       const { data, error: requestError } = await db.from("staff_registration_requests")
-        .select("id, full_name, mobile, requested_role, union_id, created_at")
+        .select("id, full_name, phone, role, union_name, created_at")
         .eq("status", "pending")
         .eq("upazila_id", officer.upazila_id)
         .order("created_at", { ascending: true });
@@ -174,14 +175,16 @@ export const listPendingStaff = createServerFn({ method: "GET" })
       ok: true as const,
       applicants,
       requests: registrationRequests.flatMap((request) => {
-        if (request.requested_role !== "worker" && request.requested_role !== "police") return [];
+        if (request.role !== "worker" && request.role !== "police") return [];
+        const station = MONIRAMPUR_STATIONS.find((item) => item.en === request.union_name);
+        if (!station) return [];
         return [{
-        id: request.id,
-        fullName: request.full_name,
-        mobile: request.mobile,
-        role: request.requested_role as "worker" | "police",
-        unionId: request.union_id,
-        createdAt: request.created_at,
+          id: request.id,
+          fullName: request.full_name,
+          mobile: request.phone,
+          role: request.role,
+          unionId: station.id,
+          createdAt: request.created_at,
         }];
       }),
     };
@@ -301,7 +304,7 @@ export const submitStaffRegistrationRequest = createServerFn({ method: "POST" })
         await logAttempt(identifier, "staff_registration_request", ip, false, "area_lookup");
         return { ok: false as const, error: "unavailable" };
       }
-      const validUnion = Array.isArray(upazila?.unions) && upazila.unions.some(
+      const selectedUnion = Array.isArray(upazila?.unions) && upazila.unions.find(
         (station) =>
           station !== null &&
           typeof station === "object" &&
@@ -310,17 +313,16 @@ export const submitStaffRegistrationRequest = createServerFn({ method: "POST" })
           station["id"] === data.unionId &&
           station["id"] !== "mn-pourashava",
       );
-      if (!validUnion) {
+      if (!selectedUnion || !("en" in selectedUnion) || typeof selectedUnion["en"] !== "string") {
         await logAttempt(identifier, "staff_registration_request", ip, false, "invalid_union");
         return { ok: false as const, error: "bad_union" };
       }
 
       const { error } = await db.from("staff_registration_requests").insert({
         full_name: data.fullName,
-        mobile,
-        requested_role: data.role,
-        upazila_id: "manirampur",
-        union_id: data.unionId,
+        phone: mobile,
+        role: data.role,
+        union_name: selectedUnion["en"],
       });
       if (error?.code === "23505") {
         await logAttempt(identifier, "staff_registration_request", ip, false, "duplicate");
@@ -512,7 +514,7 @@ export const createStaff = createServerFn({ method: "POST" })
     if (data.registrationRequestId) {
       if (!fieldRole || !data.unionId) return { ok: false as const, error: "bad_request" };
       const { data: request, error: requestError } = await db.from("staff_registration_requests")
-        .select("id, full_name, mobile, requested_role, upazila_id, union_id")
+        .select("id, full_name, phone, role, union_name, upazila_id")
         .eq("id", data.registrationRequestId)
         .eq("status", "pending")
         .maybeSingle();
@@ -522,11 +524,11 @@ export const createStaff = createServerFn({ method: "POST" })
       }
       if (
         !request ||
-        request.requested_role !== data.role ||
+        request.role !== data.role ||
         request.full_name !== data.nameEn.trim() ||
-        request.mobile !== normalizePhone(data.contact) ||
+        request.phone !== normalizePhone(data.contact) ||
         request.upazila_id !== data.upazilaId ||
-        request.union_id !== data.unionId
+        request.union_name !== MONIRAMPUR_STATIONS.find((item) => item.id === data.unionId)?.en
       ) {
         return { ok: false as const, error: "bad_request" };
       }

@@ -103,32 +103,88 @@ export const listPendingStaff = createServerFn({ method: "GET" })
       console.error("Could not load pending staff registrations", pendingError.message);
       return { ok: false as const, error: "unavailable" };
     }
-    if (!profiles?.length) return { ok: true as const, applicants: [] };
 
-    const { data: applicantRoles, error: applicantRolesError } = await db.from("user_roles")
-      .select("user_id, role").in("user_id", profiles.map((profile) => profile.id));
-    if (applicantRolesError) {
-      console.error("Could not load pending applicant roles", applicantRolesError.message);
-      return { ok: false as const, error: "unavailable" };
+    let registrationRequests: {
+      id: string;
+      full_name: string;
+      mobile: string;
+      requested_role: string;
+      union_id: string;
+      created_at: string;
+    }[] = [];
+    if (isUno) {
+      const staleProcessingBefore = new Date(Date.now() - 10 * 60_000).toISOString();
+      const { error: recoverError } = await db.from("staff_registration_requests")
+        .update({ status: "pending", processing_by: null, processing_at: null })
+        .eq("status", "processing")
+        .eq("upazila_id", officer.upazila_id)
+        .lt("processing_at", staleProcessingBefore);
+      if (recoverError) {
+        console.error("Could not recover interrupted registration requests", recoverError.message);
+        return { ok: false as const, error: "unavailable" };
+      }
+
+      const { data, error: requestError } = await db.from("staff_registration_requests")
+        .select("id, full_name, mobile, requested_role, union_id, created_at")
+        .eq("status", "pending")
+        .eq("upazila_id", officer.upazila_id)
+        .order("created_at", { ascending: true });
+      if (requestError) {
+        console.error("Could not load staff registration requests", requestError.message);
+        return { ok: false as const, error: "unavailable" };
+      }
+      registrationRequests = data ?? [];
     }
-    const applicants = profiles.flatMap((profile) => {
-      const role = applicantRoles?.find((item) => item.user_id === profile.id)?.role;
-      if (role !== "worker" && role !== "police" && role !== "admin") return [];
-      if (
-        (isAdmin && role !== "worker" && role !== "police") ||
-        (isUno && role !== "admin")
-      ) return [];
-      return [{
-        id: profile.id,
-        nameBn: profile.name_bn,
-        nameEn: profile.name_en,
-        email: profile.email,
-        mobile: profile.mobile,
-        role,
-        createdAt: profile.created_at,
-      }];
-    });
-    return { ok: true as const, applicants };
+
+    let applicants: {
+      id: string;
+      nameBn: string;
+      nameEn: string;
+      email: string | null;
+      mobile: string | null;
+      role: "worker" | "police" | "admin";
+      createdAt: string;
+    }[] = [];
+    if (profiles?.length) {
+      const { data: applicantRoles, error: applicantRolesError } = await db.from("user_roles")
+        .select("user_id, role").in("user_id", profiles.map((profile) => profile.id));
+      if (applicantRolesError) {
+        console.error("Could not load pending applicant roles", applicantRolesError.message);
+        return { ok: false as const, error: "unavailable" };
+      }
+      applicants = profiles.flatMap((profile) => {
+        const role = applicantRoles?.find((item) => item.user_id === profile.id)?.role;
+        if (role !== "worker" && role !== "police" && role !== "admin") return [];
+        if (
+          (isAdmin && role !== "worker" && role !== "police") ||
+          (isUno && role !== "admin")
+        ) return [];
+        return [{
+          id: profile.id,
+          nameBn: profile.name_bn,
+          nameEn: profile.name_en,
+          email: profile.email,
+          mobile: profile.mobile,
+          role,
+          createdAt: profile.created_at,
+        }];
+      });
+    }
+    return {
+      ok: true as const,
+      applicants,
+      requests: registrationRequests.flatMap((request) => {
+        if (request.requested_role !== "worker" && request.requested_role !== "police") return [];
+        return [{
+        id: request.id,
+        fullName: request.full_name,
+        mobile: request.mobile,
+        role: request.requested_role as "worker" | "police",
+        unionId: request.union_id,
+        createdAt: request.created_at,
+        }];
+      }),
+    };
   });
 
 export const reviewStaffRegistration = createServerFn({ method: "POST" })
@@ -216,6 +272,74 @@ export const reviewStaffRegistration = createServerFn({ method: "POST" })
       return { ok: true as const, warning: "audit_failed" };
     }
     return { ok: true as const };
+  });
+
+/* ---------- Public registration requests (no auth account is created) ---------- */
+export const submitStaffRegistrationRequest = createServerFn({ method: "POST" })
+  .validator((d) => z.object({
+    fullName: z.string().trim().min(1).max(100),
+    mobile: z.string().trim().max(20),
+    role: z.enum(["worker", "police"]),
+    unionId: z.string().min(1).max(64),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const mobile = normalizePhone(data.mobile);
+    if (!mobile) return { ok: false as const, error: "bad_phone" };
+
+    const ip = clientIp();
+    const identifier = `staff-registration:${await sha256(ip)}`;
+    try {
+      if ((await recentCount(identifier, "staff_registration_request", 60)) >= 5) {
+        return { ok: false as const, error: "too_many" };
+      }
+
+      const db = await admin();
+      const { data: upazila, error: upazilaError } = await db.from("upazilas")
+        .select("unions").eq("id", "manirampur").maybeSingle();
+      if (upazilaError) {
+        console.error("Could not validate staff registration request area", upazilaError.message);
+        await logAttempt(identifier, "staff_registration_request", ip, false, "area_lookup");
+        return { ok: false as const, error: "unavailable" };
+      }
+      const validUnion = Array.isArray(upazila?.unions) && upazila.unions.some(
+        (station) =>
+          station !== null &&
+          typeof station === "object" &&
+          !Array.isArray(station) &&
+          "id" in station &&
+          station["id"] === data.unionId &&
+          station["id"] !== "mn-pourashava",
+      );
+      if (!validUnion) {
+        await logAttempt(identifier, "staff_registration_request", ip, false, "invalid_union");
+        return { ok: false as const, error: "bad_union" };
+      }
+
+      const { error } = await db.from("staff_registration_requests").insert({
+        full_name: data.fullName,
+        mobile,
+        requested_role: data.role,
+        upazila_id: "manirampur",
+        union_id: data.unionId,
+      });
+      if (error?.code === "23505") {
+        await logAttempt(identifier, "staff_registration_request", ip, false, "duplicate");
+        return { ok: false as const, error: "duplicate" };
+      }
+      if (error) {
+        console.error("Could not save staff registration request", error.message);
+        await logAttempt(identifier, "staff_registration_request", ip, false, "database_error");
+        return { ok: false as const, error: "unavailable" };
+      }
+      await logAttempt(identifier, "staff_registration_request", ip, true);
+      return { ok: true as const };
+    } catch (cause) {
+      console.error(
+        "Could not submit staff registration request",
+        cause instanceof Error ? cause.message : "Unknown server error",
+      );
+      return { ok: false as const, error: "unavailable" };
+    }
   });
 
 /* ---------- Phone OTP (field staff) ---------- */
@@ -331,6 +455,7 @@ export const createStaff = createServerFn({ method: "POST" })
     upazilaId: z.string().min(1).max(64),
     unionId: z.string().max(64).optional(),
     ward: z.number().int().min(1).max(9).optional(),
+    registrationRequestId: z.string().uuid().optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const claims = context.claims as { aal?: string };
@@ -383,6 +508,57 @@ export const createStaff = createServerFn({ method: "POST" })
       return { ok: false as const, error: "bad_union" };
     }
 
+    let registrationRequestId: string | undefined;
+    if (data.registrationRequestId) {
+      if (!fieldRole || !data.unionId) return { ok: false as const, error: "bad_request" };
+      const { data: request, error: requestError } = await db.from("staff_registration_requests")
+        .select("id, full_name, mobile, requested_role, upazila_id, union_id")
+        .eq("id", data.registrationRequestId)
+        .eq("status", "pending")
+        .maybeSingle();
+      if (requestError) {
+        console.error("Could not verify staff registration request", requestError.message);
+        return { ok: false as const, error: "unavailable" };
+      }
+      if (
+        !request ||
+        request.requested_role !== data.role ||
+        request.full_name !== data.nameEn.trim() ||
+        request.mobile !== normalizePhone(data.contact) ||
+        request.upazila_id !== data.upazilaId ||
+        request.union_id !== data.unionId
+      ) {
+        return { ok: false as const, error: "bad_request" };
+      }
+
+      const { data: claimedRequest, error: claimError } = await db.from("staff_registration_requests")
+        .update({
+          status: "processing",
+          processing_by: context.userId,
+          processing_at: new Date().toISOString(),
+        })
+        .eq("id", request.id)
+        .eq("status", "pending")
+        .select("id")
+        .maybeSingle();
+      if (claimError) {
+        console.error("Could not claim staff registration request", claimError.message);
+        return { ok: false as const, error: "unavailable" };
+      }
+      if (!claimedRequest) return { ok: false as const, error: "request_unavailable" };
+      registrationRequestId = claimedRequest.id;
+    }
+
+    const restoreRegistrationRequest = async () => {
+      if (!registrationRequestId) return;
+      const { error } = await db.from("staff_registration_requests")
+        .update({ status: "pending", processing_by: null, processing_at: null })
+        .eq("id", registrationRequestId)
+        .eq("status", "processing")
+        .eq("processing_by", context.userId);
+      if (error) console.error("Could not restore staff registration request", error.message);
+    };
+
     let created;
     if (fieldRole) {
       const phone = normalizePhone(data.contact);
@@ -394,7 +570,10 @@ export const createStaff = createServerFn({ method: "POST" })
       const pw = crypto.randomUUID() + crypto.randomUUID();
       created = await db.auth.admin.createUser({ email: email.data, password: pw, email_confirm: true });
     }
-    if (created.error || !created.data.user) return { ok: false as const, error: created.error?.message ?? "failed" };
+    if (created.error || !created.data.user) {
+      await restoreRegistrationRequest();
+      return { ok: false as const, error: created.error?.message ?? "failed" };
+    }
     const uid = created.data.user.id;
     const { error: pe } = await db.from("profiles").insert({
       id: uid, name_bn: data.nameBn, name_en: data.nameEn,
@@ -408,6 +587,7 @@ export const createStaff = createServerFn({ method: "POST" })
     if (pe) {
       const { error: cleanupError } = await db.auth.admin.deleteUser(uid);
       if (cleanupError) console.error("Could not clean up staff account after profile creation failed", cleanupError.message);
+      await restoreRegistrationRequest();
       console.error("Could not create staff profile", pe.message);
       return { ok: false as const, error: "profile_failed" };
     }
@@ -415,6 +595,7 @@ export const createStaff = createServerFn({ method: "POST" })
     if (roleError) {
       const { error: cleanupError } = await db.auth.admin.deleteUser(uid);
       if (cleanupError) console.error("Could not clean up staff account after role assignment failed", cleanupError.message);
+      await restoreRegistrationRequest();
       console.error("Could not assign staff role", roleError.message);
       return { ok: false as const, error: "role_failed" };
     }
@@ -426,8 +607,29 @@ export const createStaff = createServerFn({ method: "POST" })
       if (resetError) {
         const { error: cleanupError } = await db.auth.admin.deleteUser(uid);
         if (cleanupError) console.error("Could not clean up staff account after password setup email failed", cleanupError.message);
+        await restoreRegistrationRequest();
         console.error("Could not send staff password setup email", resetError.message);
         return { ok: false as const, error: "password_setup_failed" };
+      }
+    }
+    if (registrationRequestId) {
+      const { error: requestUpdateError } = await db.from("staff_registration_requests")
+        .update({
+          status: "provisioned",
+          processing_by: null,
+          processing_at: null,
+          reviewed_by: context.userId,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq("id", registrationRequestId)
+        .eq("status", "processing")
+        .eq("processing_by", context.userId);
+      if (requestUpdateError) {
+        const { error: cleanupError } = await db.auth.admin.deleteUser(uid);
+        if (cleanupError) console.error("Could not clean up staff account after registration request update failed", cleanupError.message);
+        await restoreRegistrationRequest();
+        console.error("Could not complete staff registration request", requestUpdateError.message);
+        return { ok: false as const, error: "request_update_failed" };
       }
     }
     const { error: auditError } = await db.from("audit_logs").insert({
@@ -440,6 +642,66 @@ export const createStaff = createServerFn({ method: "POST" })
       return { ok: true as const, warning: "audit_failed" };
     }
     return { ok: true as const, approvalStatus: data.role === "uno" ? "approved" as const : "pending" as const };
+  });
+
+export const rejectStaffRegistrationRequest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d) => z.object({ requestId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    if ((context.claims as { aal?: string }).aal !== "aal2") {
+      return { ok: false as const, error: "mfa_required" };
+    }
+    const { data: roles, error: rolesError } = await context.supabase
+      .from("user_roles").select("role").eq("user_id", context.userId);
+    if (rolesError) {
+      console.error("Could not verify registration-request reviewer role", rolesError.message);
+      return { ok: false as const, error: "unavailable" };
+    }
+    if (roles?.length !== 1 || roles[0]?.role !== "uno") {
+      return { ok: false as const, error: "forbidden" };
+    }
+    const { data: officer, error: officerError } = await context.supabase.from("profiles")
+      .select("active, status, approval_status, upazila_id")
+      .eq("id", context.userId)
+      .maybeSingle();
+    if (officerError) {
+      console.error("Could not load registration-request reviewer scope", officerError.message);
+      return { ok: false as const, error: "unavailable" };
+    }
+    if (!officer?.active || officer.status !== "active" || officer.approval_status !== "approved" || !officer.upazila_id) {
+      return { ok: false as const, error: "forbidden" };
+    }
+
+    const db = await admin();
+    const { data: rejected, error: rejectError } = await db.from("staff_registration_requests")
+      .update({
+        status: "rejected",
+        processing_by: null,
+        processing_at: null,
+        reviewed_by: context.userId,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq("id", data.requestId)
+      .eq("status", "pending")
+      .eq("upazila_id", officer.upazila_id)
+      .select("id")
+      .maybeSingle();
+    if (rejectError) {
+      console.error("Could not reject staff registration request", rejectError.message);
+      return { ok: false as const, error: "unavailable" };
+    }
+    if (!rejected) return { ok: false as const, error: "request_unavailable" };
+
+    const { error: auditError } = await db.from("audit_logs").insert({
+      user_id: context.userId,
+      action: "staff:registration_request:reject",
+      details: { request_id: data.requestId },
+    });
+    if (auditError) {
+      console.error("Staff registration request rejected but audit logging failed", auditError.message);
+      return { ok: true as const, warning: "audit_failed" };
+    }
+    return { ok: true as const };
   });
 
 /* ---------- Recovery codes ---------- */

@@ -335,6 +335,73 @@ export type Database = {
           },
         ]
       }
+      staff_registration_requests: {
+        Row: {
+          created_at: string
+          full_name: string
+          id: string
+          mobile: string
+          processing_at: string | null
+          processing_by: string | null
+          requested_role: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          union_id: string
+          upazila_id: string
+        }
+        Insert: {
+          created_at?: string
+          full_name: string
+          id?: string
+          mobile: string
+          processing_at?: string | null
+          processing_by?: string | null
+          requested_role: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          union_id: string
+          upazila_id: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string
+          id?: string
+          mobile?: string
+          processing_at?: string | null
+          processing_by?: string | null
+          requested_role?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          union_id?: string
+          upazila_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_registration_requests_processing_by_fkey"
+            columns: ["processing_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_registration_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_registration_requests_upazila_id_fkey"
+            columns: ["upazila_id"]
+            isOneToOne: false
+            referencedRelation: "upazilas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       epi_visits: {
         Row: {
           attended_at: string

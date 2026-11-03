@@ -30,7 +30,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { roleLabel, useApp } from "@/lib/store";
-import { getStationsForUpazila } from "@/lib/monirampur-stations";
+import { getStationsForUpazila, MONIRAMPUR_STATIONS } from "@/lib/monirampur-stations";
 import {
   EXECUTIVE_PREVIEW_ROLES,
   isPreviewRole,
@@ -43,6 +43,7 @@ import {
   passwordSignIn,
   requestPasswordReset,
   sendPhoneOtp,
+  submitStaffRegistrationRequest,
   verifyPhoneOtp,
 } from "@/lib/auth.functions";
 
@@ -459,8 +460,14 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
   const nav = useNavigate();
   const sendOtp = useServerFn(sendPhoneOtp), verifyOtp = useServerFn(verifyPhoneOtp);
   const pwSignIn = useServerFn(passwordSignIn), reset = useServerFn(requestPasswordReset);
+  const submitRegistrationRequest = useServerFn(submitStaffRegistrationRequest);
   const [mobile, setMobile] = useState(""); const [otp, setOtp] = useState(""); const [sent, setSent] = useState(false);
   const [email, setEmail] = useState(""); const [pw, setPw] = useState(""); const [forgot, setForgot] = useState(false);
+  const [fullName, setFullName] = useState("");
+  const [requestMobile, setRequestMobile] = useState("");
+  const [requestRole, setRequestRole] = useState<"worker" | "police">("worker");
+  const [requestUnion, setRequestUnion] = useState("");
+  const [requestSubmitted, setRequestSubmitted] = useState(false);
   const [loginMessage, setLoginMessage] = useState<"pending" | "rejected" | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -488,20 +495,38 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
     onClose();
     nav({ to: "/dashboard" });
   };
-  const run = async (f: () => Promise<void>) => { setBusy(true); try { await f(); } finally { setBusy(false); } };
+  const run = async (f: () => Promise<void>) => {
+    setBusy(true);
+    try {
+      await f();
+    } catch (cause) {
+      console.error("Authentication operation failed", cause instanceof Error ? cause.message : "Unknown error");
+      toast.error(L("সেবা সাময়িকভাবে অনুপলব্ধ, পরে চেষ্টা করুন", "The service is temporarily unavailable; try again later"));
+    } finally {
+      setBusy(false);
+    }
+  };
 
+  useEffect(() => {
+    if (!open) {
+      setRequestSubmitted(false);
+      setFullName("");
+      setRequestMobile("");
+      setRequestUnion("");
+    }
+  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{L("লগইন করুন", "Sign in")}</DialogTitle>
-          <DialogDescription>{L("আপনার ভূমিকা অনুযায়ী ড্যাশবোর্ড স্বয়ংক্রিয়ভাবে খুলবে", "Your role-specific dashboard opens automatically")}</DialogDescription>
+          <DialogTitle>{L("লগইন বা নিবন্ধনের অনুরোধ", "Login or request registration")}</DialogTitle>
+          <DialogDescription>{L("বিদ্যমান অ্যাকাউন্টে লগইন করুন অথবা কর্মী হিসেবে নিবন্ধনের অনুরোধ পাঠান", "Sign in to an existing account or request staff registration")}</DialogDescription>
         </DialogHeader>
-        <Tabs defaultValue="otp">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="otp">{L("মোবাইল ও OTP", "Mobile & OTP")}</TabsTrigger>
-            <TabsTrigger value="pw">{L("পাসওয়ার্ড", "Password")}</TabsTrigger>
+        <Tabs defaultValue="login">
+          <TabsList className="grid h-auto w-full grid-cols-2">
+            <TabsTrigger value="login">{L("লগইন", "Login")}</TabsTrigger>
+            <TabsTrigger value="register">{L("নিবন্ধন", "Register")}</TabsTrigger>
           </TabsList>
           {loginMessage && (
             <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950" role="status" aria-live="polite">
@@ -510,7 +535,13 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
                 : L("আপনার নিবন্ধন অনুমোদিত হয়নি।", "Your registration was not approved.")}
             </div>
           )}
-          <TabsContent value="otp" className="space-y-3 pt-2">
+          <TabsContent value="login" className="pt-2">
+            <Tabs defaultValue="otp">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="otp">{L("মোবাইল ও OTP", "Mobile & OTP")}</TabsTrigger>
+                <TabsTrigger value="pw">{L("পাসওয়ার্ড", "Password")}</TabsTrigger>
+              </TabsList>
+              <TabsContent value="otp" className="space-y-3 pt-2">
             <p className="text-xs text-muted-foreground">{L("স্বাস্থ্যকর্মী ও গ্রাম পুলিশের জন্য", "For Health Workers & Village Police")}</p>
             {demoLoginAvailable && (
               <p className="text-xs text-amber-800">
@@ -579,7 +610,103 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
               <button className="text-sm text-primary underline" onClick={() => setForgot(true)}>{L("পাসওয়ার্ড ভুলে গেছেন?", "Forgot password?")}</button>
             </>)}
           </TabsContent>
-
+            </Tabs>
+          </TabsContent>
+          <TabsContent value="register" className="space-y-3 pt-2">
+            {requestSubmitted ? (
+              <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-950" role="status" aria-live="polite">
+                {L(
+                  "আপনার অনুরোধ জমা হয়েছে। সংশ্লিষ্ট কর্মকর্তা অ্যাকাউন্ট তৈরি করলে মোবাইল OTP দিয়ে লগইন করতে পারবেন।",
+                  "Your request was submitted. You can sign in with mobile OTP after the responsible officer creates your account.",
+                )}
+              </div>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  {L(
+                    "স্বাস্থ্যকর্মী বা গ্রাম পুলিশ হিসেবে আবেদন করুন। এটি শুধু অনুরোধ—এখনই কোনো অ্যাকাউন্ট বা পাসওয়ার্ড তৈরি হবে না।",
+                    "Request access as a Health Worker or Gram Police. This is only a request; no account or password is created yet.",
+                  )}
+                </p>
+                <div className="space-y-1">
+                  <Label htmlFor="registration-full-name">{L("পূর্ণ নাম", "Full name")}</Label>
+                  <Input
+                    id="registration-full-name"
+                    autoComplete="name"
+                    maxLength={100}
+                    value={fullName}
+                    onChange={(event) => setFullName(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="registration-mobile">{L("মোবাইল নম্বর", "Mobile number")}</Label>
+                  <Input
+                    id="registration-mobile"
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel"
+                    maxLength={11}
+                    placeholder="01XXXXXXXXX"
+                    value={requestMobile}
+                    onChange={(event) => setRequestMobile(event.target.value.replace(/\D/g, ""))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>{L("যে ভূমিকার জন্য আবেদন", "Role requested")}</Label>
+                  <Select value={requestRole} onValueChange={(value) => {
+                    if (value === "worker" || value === "police") setRequestRole(value);
+                  }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="worker">{L("স্বাস্থ্যকর্মী", "Health Worker")}</SelectItem>
+                      <SelectItem value="police">{L("গ্রাম পুলিশ", "Gram Police")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>{L("ইউনিয়ন", "Union")}</Label>
+                  <Select value={requestUnion} onValueChange={setRequestUnion}>
+                    <SelectTrigger><SelectValue placeholder={L("ইউনিয়ন বেছে নিন", "Select your union")} /></SelectTrigger>
+                    <SelectContent>
+                      {MONIRAMPUR_STATIONS.filter((station) => station.type === "union").map((station) => (
+                        <SelectItem key={station.id} value={station.id}>{L(station.bn, station.en)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  className="w-full"
+                  disabled={busy || !fullName.trim() || requestMobile.length !== 11 || !requestUnion}
+                  onClick={() => void run(async () => {
+                    const result = await submitRegistrationRequest({
+                      data: { fullName: fullName.trim(), mobile: requestMobile, role: requestRole, unionId: requestUnion },
+                    });
+                    if (!result.ok) {
+                      toast.error(
+                        result.error === "bad_phone"
+                          ? L("সঠিক মোবাইল নম্বর দিন", "Enter a valid mobile number")
+                          : result.error === "bad_union"
+                            ? L("সঠিক ইউনিয়ন বেছে নিন", "Select a valid union")
+                            : result.error === "duplicate"
+                              ? L("এই নম্বরের একটি অনুরোধ ইতিমধ্যে অপেক্ষমাণ", "A request for this number is already pending")
+                              : result.error === "too_many"
+                                ? L("অনেকবার অনুরোধ করা হয়েছে। পরে আবার চেষ্টা করুন", "Too many requests. Please try again later")
+                                : L("অনুরোধ জমা দেওয়া যায়নি। পরে আবার চেষ্টা করুন", "Could not submit the request. Please try again later"),
+                      );
+                      return;
+                    }
+                    setRequestSubmitted(true);
+                    setFullName("");
+                    setRequestMobile("");
+                    setRequestUnion("");
+                    toast.success(L("নিবন্ধনের অনুরোধ জমা হয়েছে", "Registration request submitted"));
+                  })}
+                >
+                  {busy ? L("জমা হচ্ছে…", "Submitting…") : L("নিবন্ধনের অনুরোধ পাঠান", "Submit registration request")}
+                </Button>
+              </>
+            )}
+          </TabsContent>
         </Tabs>
         {demoLoginAvailable && (
           <p className="border-t border-dashed pt-3 text-xs text-amber-800">

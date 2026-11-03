@@ -7,7 +7,12 @@ import { Label } from "@/components/ui/label";
 import { ModuleNavigation } from "./ModuleNavigation";
 import { PageTitle } from "@/components/shared";
 import { useServerFn } from "@tanstack/react-start";
-import { createStaff, listPendingStaff, reviewStaffRegistration } from "@/lib/auth.functions";
+import {
+  createStaff,
+  listPendingStaff,
+  rejectStaffRegistrationRequest,
+  reviewStaffRegistration,
+} from "@/lib/auth.functions";
 import { useApp } from "@/lib/store";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -18,6 +23,15 @@ type Applicant = {
   email: string | null;
   mobile: string | null;
   role: "worker" | "police" | "admin";
+  createdAt: string;
+};
+
+type RegistrationRequest = {
+  id: string;
+  fullName: string;
+  mobile: string;
+  role: "worker" | "police";
+  unionId: string;
   createdAt: string;
 };
 
@@ -34,7 +48,9 @@ export function ApprovalManagement() {
   const loadApplicants = useServerFn(listPendingStaff);
   const review = useServerFn(reviewStaffRegistration);
   const provision = useServerFn(createStaff);
+  const rejectRequest = useServerFn(rejectStaffRegistrationRequest);
   const [applicants, setApplicants] = useState<Applicant[]>([]);
+  const [requests, setRequests] = useState<RegistrationRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -58,6 +74,7 @@ export function ApprovalManagement() {
       if (!result.ok) {
         setError(true);
         setApplicants([]);
+        setRequests([]);
         toast.error(
           result.error === "mfa_required"
             ? L("অনুমোদন পর্যালোচনার জন্য MFA যাচাই করুন", "Verify MFA to review registrations")
@@ -67,10 +84,12 @@ export function ApprovalManagement() {
         );
       } else {
         setApplicants(result.applicants);
+        setRequests(result.requests);
       }
     } catch (cause) {
       console.error("Could not load pending registrations", cause);
       setApplicants([]);
+      setRequests([]);
       setError(true);
       toast.error(L("নিবন্ধনের তালিকা লোড করা যায়নি", "Could not load pending registrations"));
     } finally {
@@ -142,6 +161,77 @@ export function ApprovalManagement() {
       toast.error(L("অ্যাকাউন্ট তৈরি করা যায়নি", "Could not create the account"));
     } finally {
       setCreating(false);
+    }
+  };
+
+  const provisionRequest = async (request: RegistrationRequest) => {
+    if (!user || !upazila) return;
+    setBusyId(request.id);
+    try {
+      const result = await provision({
+        data: {
+          role: request.role,
+          nameBn: request.fullName,
+          nameEn: request.fullName,
+          contact: request.mobile,
+          upazilaId: upazila.id,
+          unionId: request.unionId,
+          ward: 1,
+          registrationRequestId: request.id,
+        },
+      });
+      if (!result.ok) {
+        toast.error(
+          result.error === "mfa_required"
+            ? L("অ্যাকাউন্ট তৈরির জন্য MFA যাচাই করুন", "Verify MFA to create an account")
+            : result.error === "request_unavailable"
+              ? L("অনুরোধটি ইতিমধ্যে প্রক্রিয়াধীন বা সম্পন্ন হয়েছে", "This request is already being processed or completed")
+              : result.error === "bad_request"
+                ? L("নিবন্ধনের অনুরোধটি যাচাই করা যায়নি", "Could not verify this registration request")
+                : L("অ্যাকাউন্ট তৈরি করা যায়নি", "Could not create the account"),
+        );
+        return;
+      }
+      toast.success(L("অ্যাকাউন্ট তৈরি হয়েছে; সংশ্লিষ্ট ইউপি কর্মকর্তা অনুমোদন করবেন", "Account created; the responsible UP officer will review it"));
+      if (result.warning === "audit_failed") {
+        toast.error(L("অ্যাকাউন্ট তৈরি হয়েছে, তবে অডিট লগ সংরক্ষণ হয়নি", "Account created, but audit logging failed"));
+      }
+      await refreshApplicants();
+      await refresh();
+    } catch (cause) {
+      console.error("Could not provision staff registration request", cause);
+      toast.error(L("অ্যাকাউন্ট তৈরি করা যায়নি", "Could not create the account"));
+      void refreshApplicants();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const dismissRequest = async (request: RegistrationRequest) => {
+    setBusyId(request.id);
+    try {
+      const result = await rejectRequest({ data: { requestId: request.id } });
+      if (!result.ok) {
+        toast.error(
+          result.error === "mfa_required"
+            ? L("অনুরোধ প্রত্যাখ্যান করতে MFA যাচাই করুন", "Verify MFA to reject this request")
+            : result.error === "request_unavailable"
+              ? L("অনুরোধটি ইতিমধ্যে প্রক্রিয়াধীন বা সম্পন্ন হয়েছে", "This request is already being processed or completed")
+              : L("অনুরোধ প্রত্যাখ্যান করা যায়নি", "Could not reject the request"),
+        );
+        return;
+      }
+      toast.success(L("নিবন্ধনের অনুরোধ প্রত্যাখ্যান করা হয়েছে", "Registration request rejected"));
+      if (result.warning === "audit_failed") {
+        toast.error(L("অনুরোধ প্রত্যাখ্যাত হয়েছে, তবে অডিট লগ সংরক্ষণ হয়নি", "Request rejected, but audit logging failed"));
+      }
+      await refreshApplicants();
+    } catch (cause) {
+      console.error("Could not reject staff registration request", cause);
+      toast.error(L("অনুরোধ প্রত্যাখ্যান করা যায়নি", "Could not reject the request"));
+      void refreshApplicants();
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -284,15 +374,48 @@ export function ApprovalManagement() {
           </p>
           <Button variant="outline" onClick={() => void refreshApplicants()}>{L("আবার চেষ্টা করুন", "Try again")}</Button>
         </div>
-      ) : applicants.length === 0 ? (
+      ) : applicants.length === 0 && requests.length === 0 ? (
         <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground">
           {isAdmin
             ? L("আপনার ইউনিয়নে অপেক্ষমাণ স্বাস্থ্যকর্মী বা গ্রাম পুলিশ নেই", "No Health Worker or Gram Police accounts are awaiting approval in your union")
-            : L("আপনার উপজেলায় অপেক্ষমাণ ইউপি প্রশাসনিক কর্মকর্তা নেই", "No UP Administrative Officer accounts are awaiting approval in your upazila")}
+            : L("আপনার উপজেলায় অপেক্ষমাণ নিবন্ধনের অনুরোধ নেই", "There are no pending registration requests in your upazila")}
         </div>
       ) : (
-        <div className="space-y-3">
-          {applicants.map((applicant) => (
+        <div className="space-y-6">
+          {user?.role === "uno" && requests.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="font-semibold">{L("নতুন নিবন্ধনের অনুরোধ", "New registration requests")}</h2>
+              {requests.map((request) => {
+                const union = upazila?.unions.find((item) => item.id === request.unionId);
+                return (
+                  <article key={request.id} className="flex flex-col gap-4 rounded-xl border border-emerald-200 bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <h3 className="font-semibold">{request.fullName}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {roleName(request.role, L)} · {union ? L(union.bn, union.en) : request.unionId}
+                      </p>
+                      <p className="break-all text-sm">{request.mobile}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {L("আবেদনের তারিখ", "Submitted")} · {new Date(request.createdAt).toLocaleDateString(L("bn-BD", "en-US"))}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <Button disabled={busyId !== null || creating} onClick={() => void provisionRequest(request)}>
+                        <UserPlus className="mr-1 h-4 w-4" />{L("অ্যাকাউন্ট তৈরি", "Create account")}
+                      </Button>
+                      <Button variant="destructive" disabled={busyId !== null || creating} onClick={() => void dismissRequest(request)}>
+                        <X className="mr-1 h-4 w-4" />{L("প্রত্যাখ্যান", "Reject")}
+                      </Button>
+                    </div>
+                  </article>
+                );
+              })}
+            </section>
+          )}
+          {applicants.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="font-semibold">{L("অনুমোদনের অপেক্ষায় থাকা অ্যাকাউন্ট", "Accounts awaiting approval")}</h2>
+              {applicants.map((applicant) => (
             <article key={applicant.id} className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <h2 className="font-semibold">{applicant.nameEn || applicant.nameBn}</h2>
@@ -315,6 +438,8 @@ export function ApprovalManagement() {
               </div>
             </article>
           ))}
+            </section>
+          )}
         </div>
       )}
     </main>

@@ -324,6 +324,7 @@ export const submitStaffRegistrationRequest = createServerFn({ method: "POST" })
         role: data.role,
         union_name: selectedUnion["en"],
       });
+      if (error) console.log(error);
       if (error?.code === "23505") {
         await logAttempt(identifier, "staff_registration_request", ip, false, "duplicate");
         return { ok: false as const, error: "duplicate" };
@@ -341,6 +342,7 @@ export const submitStaffRegistrationRequest = createServerFn({ method: "POST" })
       await logAttempt(identifier, "staff_registration_request", ip, true);
       return { ok: true as const };
     } catch (error) {
+      console.log(error);
       console.error("Staff Registration Error Details:", error);
       return { ok: false as const, error: "unavailable" };
     }

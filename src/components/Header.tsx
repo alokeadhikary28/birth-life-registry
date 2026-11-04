@@ -684,7 +684,7 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
                         data: { fullName: fullName.trim(), mobile: requestMobile, role: requestRole, unionId: requestUnion },
                       });
                     } catch (err) {
-                      console.error("Direct Supabase Insert Error:", err);
+                      console.error("Full Supabase Error:", JSON.stringify(err, null, 2));
                       alert(L("অনুরোধ জমা দেওয়া যায়নি। পরে আবার চেষ্টা করুন", "Could not submit the request. Please try again later"));
                       return;
                     }

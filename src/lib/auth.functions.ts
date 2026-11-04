@@ -344,7 +344,12 @@ export const submitStaffRegistrationRequest = createServerFn({ method: "POST" })
     } catch (error) {
       console.log(error);
       console.error("Staff Registration Error Details:", error);
-      return { ok: false as const, error: "unavailable" };
+      return {
+        ok: false as const,
+        error: "unavailable",
+        debugMessage:
+          import.meta.env.DEV && error instanceof Error ? error.message : undefined,
+      };
     }
   });
 

@@ -690,7 +690,9 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
                     }
                     if (!result.ok) {
                       toast.error(
-                        result.error === "bad_phone"
+                        result.error === "unavailable" && result.debugMessage
+                          ? result.debugMessage
+                          : result.error === "bad_phone"
                           ? L("সঠিক মোবাইল নম্বর দিন", "Enter a valid mobile number")
                           : result.error === "bad_union"
                             ? L("সঠিক ইউনিয়ন বেছে নিন", "Select a valid union")

@@ -332,7 +332,11 @@ export const submitStaffRegistrationRequest = createServerFn({ method: "POST" })
         console.error("Staff Registration Error Details:", error);
         console.error("Could not save staff registration request", error.message);
         await logAttempt(identifier, "staff_registration_request", ip, false, "database_error");
-        return { ok: false as const, error: "unavailable" };
+        return {
+          ok: false as const,
+          error: "unavailable",
+          debugMessage: import.meta.env.DEV ? error.message : undefined,
+        };
       }
       await logAttempt(identifier, "staff_registration_request", ip, true);
       return { ok: true as const };

@@ -329,17 +329,15 @@ export const submitStaffRegistrationRequest = createServerFn({ method: "POST" })
         return { ok: false as const, error: "duplicate" };
       }
       if (error) {
+        console.error("Staff Registration Error Details:", error);
         console.error("Could not save staff registration request", error.message);
         await logAttempt(identifier, "staff_registration_request", ip, false, "database_error");
         return { ok: false as const, error: "unavailable" };
       }
       await logAttempt(identifier, "staff_registration_request", ip, true);
       return { ok: true as const };
-    } catch (cause) {
-      console.error(
-        "Could not submit staff registration request",
-        cause instanceof Error ? cause.message : "Unknown server error",
-      );
+    } catch (error) {
+      console.error("Staff Registration Error Details:", error);
       return { ok: false as const, error: "unavailable" };
     }
   });

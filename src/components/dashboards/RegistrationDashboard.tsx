@@ -560,7 +560,11 @@ function ApplicationList({
                                       </p>
                                       <p>
                                         {L("ছবির সময়", "Photo time")}:{" "}
-                                        {new Date(file.fieldVisit.capturedAt).toLocaleString()}
+                                        {new Intl.DateTimeFormat(L("bn-BD", "en-GB"), {
+                                          dateStyle: "medium",
+                                          timeStyle: "short",
+                                          timeZone: "Asia/Dhaka",
+                                        }).format(new Date(file.fieldVisit.capturedAt))}
                                       </p>
                                       {file.fieldVisit.latitude !== undefined &&
                                         file.fieldVisit.longitude !== undefined && (
@@ -2512,7 +2516,10 @@ export function RegistrationDashboard({
                                     : record.caseId}
                                 </strong>
                                 <span className="text-muted-foreground">
-                                  {new Date(record.createdAt).toLocaleDateString()}
+                                  {new Intl.DateTimeFormat(L("bn-BD", "en-GB"), {
+                                    dateStyle: "medium",
+                                    timeZone: "Asia/Dhaka",
+                                  }).format(new Date(record.createdAt))}
                                 </span>
                               </div>
                               <p className="mt-2 whitespace-pre-wrap text-sm">{record.text}</p>

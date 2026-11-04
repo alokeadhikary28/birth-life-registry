@@ -678,9 +678,16 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
                   className="w-full"
                   disabled={busy || !fullName.trim() || requestMobile.length !== 11 || !requestUnion}
                   onClick={() => void run(async () => {
-                    const result = await submitRegistrationRequest({
-                      data: { fullName: fullName.trim(), mobile: requestMobile, role: requestRole, unionId: requestUnion },
-                    });
+                    let result: Awaited<ReturnType<typeof submitRegistrationRequest>>;
+                    try {
+                      result = await submitRegistrationRequest({
+                        data: { fullName: fullName.trim(), mobile: requestMobile, role: requestRole, unionId: requestUnion },
+                      });
+                    } catch (err) {
+                      console.error("Direct Supabase Insert Error:", err);
+                      alert(L("অনুরোধ জমা দেওয়া যায়নি। পরে আবার চেষ্টা করুন", "Could not submit the request. Please try again later"));
+                      return;
+                    }
                     if (!result.ok) {
                       toast.error(
                         result.error === "bad_phone"

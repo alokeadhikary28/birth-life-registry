@@ -815,7 +815,12 @@ export function RegForm({
       </div>
       {visitPhotoMetadata && (
         <p className="text-xs text-slate-600">
-          {L("ছবির সময়", "Photo time")}: {new Date(visitPhotoMetadata.capturedAt).toLocaleString()}
+          {L("ছবির সময়", "Photo time")}:{" "}
+          {new Intl.DateTimeFormat(L("bn-BD", "en-GB"), {
+            dateStyle: "medium",
+            timeStyle: "short",
+            timeZone: "Asia/Dhaka",
+          }).format(new Date(visitPhotoMetadata.capturedAt))}
           {visitPhotoMetadata.latitude !== undefined && visitPhotoMetadata.longitude !== undefined
             ? ` · GPS: ${visitPhotoMetadata.latitude.toFixed(6)}, ${visitPhotoMetadata.longitude.toFixed(6)}`
             : gpsEnabled
@@ -826,7 +831,11 @@ export function RegForm({
       {!visitPhoto && !filesChanged && oldVisitPhoto?.fieldVisit && (
         <p className="text-xs text-slate-600">
           {L("সংরক্ষিত ছবির সময়", "Saved photo time")}:{" "}
-          {new Date(oldVisitPhoto.fieldVisit.capturedAt).toLocaleString()}
+          {new Intl.DateTimeFormat(L("bn-BD", "en-GB"), {
+            dateStyle: "medium",
+            timeStyle: "short",
+            timeZone: "Asia/Dhaka",
+          }).format(new Date(oldVisitPhoto.fieldVisit.capturedAt))}
           {oldVisitPhoto.fieldVisit.latitude !== undefined &&
             oldVisitPhoto.fieldVisit.longitude !== undefined &&
             ` · GPS: ${oldVisitPhoto.fieldVisit.latitude.toFixed(6)}, ${oldVisitPhoto.fieldVisit.longitude.toFixed(6)}`}

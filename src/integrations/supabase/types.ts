@@ -343,10 +343,10 @@ export type Database = {
           phone: string
           processing_at: string | null
           processing_by: string | null
-          role: string
+          role: "worker" | "police"
           reviewed_at: string | null
           reviewed_by: string | null
-          status: string
+          status: "pending" | "processing" | "provisioned" | "approved" | "rejected"
           union_name: string
           upazila_id: string
         }
@@ -357,10 +357,10 @@ export type Database = {
           phone: string
           processing_at?: string | null
           processing_by?: string | null
-          role: string
+          role: "worker" | "police"
           reviewed_at?: string | null
           reviewed_by?: string | null
-          status?: string
+          status?: "pending" | "processing" | "provisioned" | "approved" | "rejected"
           union_name: string
           upazila_id: string
         }
@@ -371,10 +371,10 @@ export type Database = {
           phone?: string
           processing_at?: string | null
           processing_by?: string | null
-          role?: string
+          role?: "worker" | "police"
           reviewed_at?: string | null
           reviewed_by?: string | null
-          status?: string
+          status?: "pending" | "processing" | "provisioned" | "approved" | "rejected"
           union_name?: string
           upazila_id?: string
         }

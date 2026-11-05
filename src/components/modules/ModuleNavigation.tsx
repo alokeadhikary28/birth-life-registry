@@ -21,7 +21,7 @@ const modules: { to: string; labelBn: string; labelEn: string; roles: readonly R
     to: "/approval-management",
     labelBn: "অনুমোদন ব্যবস্থাপনা",
     labelEn: "Approval Management",
-    roles: ["admin", "uno"],
+    roles: ["admin"],
   },
   { to: "/correction-log", labelBn: "সংশোধন লগ", labelEn: "Correction log", roles: ["super"] },
   {

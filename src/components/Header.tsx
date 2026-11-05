@@ -356,7 +356,7 @@ export function Header() {
         </Link>
         {canSwitchUnion && stationOptions.length > 0 && (
           <Select
-            value={activeUnionId ?? (stationOptions.some((station) => station.id === "mn-dhakuria") ? "mn-dhakuria" : stationOptions[0]?.id)}
+            value={activeUnionId ?? (stationOptions.some((station) => station.id === "mn-dhakuria") ? "mn-dhakuria" : stationOptions[0]!.id)}
             onValueChange={(stationId) => {
               setActiveUnionId(stationId);
               void nav({ to: "/union-master" });

@@ -52,7 +52,7 @@ export const passwordSignIn = createServerFn({ method: "POST" })
     return { ok: true, tokens: { access_token: s.session.access_token, refresh_token: s.session.refresh_token } };
   });
 
-/* ---------- Hierarchical staff account approval ---------- */
+/* ---------- Admin staff approval ---------- */
 export const listPendingStaff = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -66,9 +66,7 @@ export const listPendingStaff = createServerFn({ method: "GET" })
       return { ok: false as const, error: "unavailable" };
     }
     const roleList = (roles ?? []).map((item) => item.role);
-    const isAdmin = roleList.length === 1 && roleList[0] === "admin";
-    const isUno = roleList.length === 1 && roleList[0] === "uno";
-    if (!isAdmin && !isUno) {
+    if (roleList.length !== 1 || roleList[0] !== "admin") {
       return { ok: false as const, error: "forbidden" };
     }
 
@@ -84,57 +82,51 @@ export const listPendingStaff = createServerFn({ method: "GET" })
       officer.status !== "active" ||
       officer.approval_status !== "approved" ||
       !officer.upazila_id ||
-      (isAdmin && (!officer.union_id || !officer.station_id))
+      !officer.union_id ||
+      officer.station_id !== officer.union_id
     ) {
       return { ok: false as const, error: "forbidden" };
     }
+    const assignedUnionId = officer.union_id;
 
-    let pendingQuery = db.from("profiles")
+    const assignedStation = MONIRAMPUR_STATIONS.find(
+      (station) => station.id === officer.station_id && station.type === "union",
+    );
+    if (!assignedStation) return { ok: false as const, error: "forbidden" };
+
+    const staleProcessingBefore = new Date(Date.now() - 10 * 60_000).toISOString();
+    const { error: recoverError } = await db.from("staff_registration_requests")
+      .update({ status: "pending", processing_by: null, processing_at: null })
+      .eq("status", "processing")
+      .eq("upazila_id", officer.upazila_id)
+      .eq("union_name", assignedStation.en)
+      .lt("processing_at", staleProcessingBefore);
+    if (recoverError) {
+      console.error("Could not recover interrupted registration requests", recoverError.message);
+      return { ok: false as const, error: "unavailable" };
+    }
+
+    const { data: profiles, error: pendingError } = await db.from("profiles")
       .select("id, name_bn, name_en, email, mobile, created_at")
       .eq("approval_status", "pending")
       .eq("upazila_id", officer.upazila_id)
+      .eq("station_id", officer.station_id)
+      .eq("union_id", officer.union_id)
       .order("created_at", { ascending: true });
-    if (isAdmin) {
-      pendingQuery = pendingQuery
-        .eq("station_id", officer.station_id!)
-        .eq("union_id", officer.union_id!);
-    }
-    const { data: profiles, error: pendingError } = await pendingQuery;
     if (pendingError) {
       console.error("Could not load pending staff registrations", pendingError.message);
       return { ok: false as const, error: "unavailable" };
     }
 
-    let registrationRequests: {
-      id: string;
-      full_name: string;
-      phone: string;
-      role: string;
-      union_name: string;
-      created_at: string;
-    }[] = [];
-    if (isUno) {
-      const staleProcessingBefore = new Date(Date.now() - 10 * 60_000).toISOString();
-      const { error: recoverError } = await db.from("staff_registration_requests")
-        .update({ status: "pending", processing_by: null, processing_at: null })
-        .eq("status", "processing")
-        .eq("upazila_id", officer.upazila_id)
-        .lt("processing_at", staleProcessingBefore);
-      if (recoverError) {
-        console.error("Could not recover interrupted registration requests", recoverError.message);
-        return { ok: false as const, error: "unavailable" };
-      }
-
-      const { data, error: requestError } = await db.from("staff_registration_requests")
-        .select("id, full_name, phone, role, union_name, created_at")
-        .eq("status", "pending")
-        .eq("upazila_id", officer.upazila_id)
-        .order("created_at", { ascending: true });
-      if (requestError) {
-        console.error("Could not load staff registration requests", requestError.message);
-        return { ok: false as const, error: "unavailable" };
-      }
-      registrationRequests = data ?? [];
+    const { data: registrationRequests, error: requestsError } = await db.from("staff_registration_requests")
+      .select("id, full_name, phone, role, union_name, created_at")
+      .eq("status", "pending")
+      .eq("upazila_id", officer.upazila_id)
+      .eq("union_name", assignedStation.en)
+      .order("created_at", { ascending: true });
+    if (requestsError) {
+      console.error("Could not load staff registration requests", requestsError.message);
+      return { ok: false as const, error: "unavailable" };
     }
 
     let applicants: {
@@ -153,13 +145,12 @@ export const listPendingStaff = createServerFn({ method: "GET" })
         console.error("Could not load pending applicant roles", applicantRolesError.message);
         return { ok: false as const, error: "unavailable" };
       }
+      const roleByUserId = new Map(
+        (applicantRoles ?? []).map((item) => [item.user_id, item.role]),
+      );
       applicants = profiles.flatMap((profile) => {
-        const role = applicantRoles?.find((item) => item.user_id === profile.id)?.role;
-        if (role !== "worker" && role !== "police" && role !== "admin") return [];
-        if (
-          (isAdmin && role !== "worker" && role !== "police") ||
-          (isUno && role !== "admin")
-        ) return [];
+        const role = roleByUserId.get(profile.id);
+        if (role !== "worker" && role !== "police") return [];
         return [{
           id: profile.id,
           nameBn: profile.name_bn,
@@ -174,19 +165,19 @@ export const listPendingStaff = createServerFn({ method: "GET" })
     return {
       ok: true as const,
       applicants,
-      requests: registrationRequests.flatMap((request) => {
-        if (request.role !== "worker" && request.role !== "police") return [];
-        const station = MONIRAMPUR_STATIONS.find((item) => item.en === request.union_name);
-        if (!station) return [];
-        return [{
-          id: request.id,
-          fullName: request.full_name,
-          mobile: request.phone,
-          role: request.role,
-          unionId: station.id,
-          createdAt: request.created_at,
-        }];
-      }),
+      requests: (registrationRequests ?? []).flatMap((request) =>
+        request.role === "worker" || request.role === "police"
+          ? [{
+              id: request.id,
+              fullName: request.full_name,
+              mobile: request.phone,
+              role: request.role,
+              unionId: assignedUnionId,
+              unionName: request.union_name,
+              createdAt: request.created_at,
+            }]
+          : [],
+      ),
     };
   });
 
@@ -207,9 +198,7 @@ export const reviewStaffRegistration = createServerFn({ method: "POST" })
       return { ok: false as const, error: "unavailable" };
     }
     const roleList = (roles ?? []).map((item) => item.role);
-    const isAdmin = roleList.length === 1 && roleList[0] === "admin";
-    const isUno = roleList.length === 1 && roleList[0] === "uno";
-    if (!isAdmin && !isUno) {
+    if (roleList.length !== 1 || roleList[0] !== "admin") {
       return { ok: false as const, error: "forbidden" };
     }
 
@@ -225,7 +214,8 @@ export const reviewStaffRegistration = createServerFn({ method: "POST" })
       officer.status !== "active" ||
       officer.approval_status !== "approved" ||
       !officer.upazila_id ||
-      (isAdmin && (!officer.union_id || !officer.station_id))
+      !officer.union_id ||
+      officer.station_id !== officer.union_id
     ) {
       return { ok: false as const, error: "forbidden" };
     }
@@ -237,13 +227,12 @@ export const reviewStaffRegistration = createServerFn({ method: "POST" })
       return { ok: false as const, error: "unavailable" };
     }
     const applicantRoles = (applicantRoleRows ?? []).map((item) => item.role);
-    const canReviewRole = isAdmin
-      ? applicantRoles.length === 1 && (applicantRoles[0] === "worker" || applicantRoles[0] === "police")
-      : applicantRoles.length === 1 && applicantRoles[0] === "admin";
+    const canReviewRole = applicantRoles.length === 1 &&
+      (applicantRoles[0] === "worker" || applicantRoles[0] === "police");
     if (!canReviewRole) return { ok: false as const, error: "not_pending_or_forbidden" };
 
     const status = data.decision === "approve" ? "active" : "rejected";
-    let updateQuery = db.from("profiles")
+    const updateQuery = db.from("profiles")
       .update({
         approval_status: data.decision === "approve" ? "approved" : "rejected",
         status,
@@ -252,12 +241,9 @@ export const reviewStaffRegistration = createServerFn({ method: "POST" })
       .eq("id", data.userId)
       .eq("approval_status", "pending")
       .eq("upazila_id", officer.upazila_id)
+      .eq("station_id", officer.station_id)
+      .eq("union_id", officer.union_id)
       .select("id");
-    if (isAdmin) {
-      updateQuery = updateQuery
-        .eq("station_id", officer.station_id!)
-        .eq("union_id", officer.union_id!);
-    }
     const { data: updated, error: updateError } = await updateQuery.maybeSingle();
     if (updateError) {
       console.error("Could not update staff approval status", updateError.message);
@@ -304,34 +290,38 @@ export const submitStaffRegistrationRequest = createServerFn({ method: "POST" })
         await logAttempt(identifier, "staff_registration_request", ip, false, "area_lookup");
         return { ok: false as const, error: "unavailable" };
       }
-      const selectedUnion = Array.isArray(upazila?.unions) && upazila.unions.find(
-        (station) =>
-          station !== null &&
-          typeof station === "object" &&
-          !Array.isArray(station) &&
-          "id" in station &&
-          station["id"] === data.unionId &&
-          station["id"] !== "mn-pourashava",
-      );
-      if (!selectedUnion || !("en" in selectedUnion) || typeof selectedUnion["en"] !== "string") {
+      const unions: unknown = upazila?.unions;
+      const selectedUnion = Array.isArray(unions)
+        ? unions.find((station: unknown): station is { id: string; en: string } =>
+            station !== null &&
+            typeof station === "object" &&
+            !Array.isArray(station) &&
+            "id" in station &&
+            typeof station.id === "string" &&
+            station.id === data.unionId &&
+            station.id !== "mn-pourashava" &&
+            "en" in station &&
+            typeof station.en === "string",
+          )
+        : undefined;
+      if (!selectedUnion) {
         await logAttempt(identifier, "staff_registration_request", ip, false, "invalid_union");
         return { ok: false as const, error: "bad_union" };
       }
-
       const { error } = await db.from("staff_registration_requests").insert({
         full_name: data.fullName,
         phone: mobile,
         role: data.role,
-        union_name: selectedUnion["en"],
+        union_name: selectedUnion.en,
+        upazila_id: "manirampur",
+        status: "pending",
       });
-      if (error) console.log(error);
-      if (error?.code === "23505") {
-        await logAttempt(identifier, "staff_registration_request", ip, false, "duplicate");
-        return { ok: false as const, error: "duplicate" };
-      }
       if (error) {
-        console.error("Staff Registration Error Details:", error);
-        console.error("Could not save staff registration request", error.message);
+        console.error(error);
+        if (error.code === "23505") {
+          await logAttempt(identifier, "staff_registration_request", ip, false, "duplicate");
+          return { ok: false as const, error: "duplicate" };
+        }
         await logAttempt(identifier, "staff_registration_request", ip, false, "database_error");
         return {
           ok: false as const,
@@ -479,15 +469,20 @@ export const createStaff = createServerFn({ method: "POST" })
     }
     const roles = (myRoles ?? []).map((r) => r.role);
     const isSuper = roles.length === 1 && roles[0] === "super";
-    const isUno = roles.length === 1 && roles[0] === "uno";
+    const isAdmin = roles.length === 1 && roles[0] === "admin";
     const fieldRole = data.role === "worker" || data.role === "police";
-    if (!isSuper && !isUno) return { ok: false as const, error: "forbidden" };
-    if (isUno && data.role === "uno") return { ok: false as const, error: "forbidden" };
+    const isRequestApproval = isAdmin && Boolean(data.registrationRequestId);
+    if ((!isSuper && !isRequestApproval) || (data.registrationRequestId && !isRequestApproval)) {
+      return { ok: false as const, error: "forbidden" };
+    }
+    if (isRequestApproval && (!fieldRole || !data.unionId)) {
+      return { ok: false as const, error: "bad_request" };
+    }
 
-    if (!isSuper) {
+    if (isRequestApproval) {
       const { data: me, error: profileError } = await context.supabase
         .from("profiles")
-        .select("active, status, approval_status, upazila_id, station_id")
+        .select("active, status, approval_status, upazila_id, union_id, station_id")
         .eq("id", context.userId)
         .maybeSingle();
       if (profileError) {
@@ -500,6 +495,9 @@ export const createStaff = createServerFn({ method: "POST" })
         me.approval_status !== "approved" ||
         me.upazila_id !== data.upazilaId
       ) {
+        return { ok: false as const, error: "forbidden" };
+      }
+      if (!me.union_id || me.station_id !== me.union_id || data.unionId !== me.union_id) {
         return { ok: false as const, error: "forbidden" };
       }
     }
@@ -515,17 +513,29 @@ export const createStaff = createServerFn({ method: "POST" })
       return { ok: false as const, error: "unavailable" };
     }
     if (!up) return { ok: false as const, error: "bad_upazila" };
-    if (data.unionId && !(up.unions as { id: string }[]).some((u) => u.id === data.unionId)) {
+    const unions = z.array(z.object({ id: z.string() }).passthrough()).safeParse(up.unions);
+    if (!unions.success) {
+      console.error("Could not validate staff unions", unions.error.message);
+      return { ok: false as const, error: "unavailable" };
+    }
+    if (data.unionId && !unions.data.some((union) => union.id === data.unionId)) {
       return { ok: false as const, error: "bad_union" };
     }
 
     let registrationRequestId: string | undefined;
     if (data.registrationRequestId) {
-      if (!fieldRole || !data.unionId) return { ok: false as const, error: "bad_request" };
+      const requestStation = MONIRAMPUR_STATIONS.find(
+        (station) => station.id === data.unionId && station.type === "union",
+      );
+      if (!isRequestApproval || !fieldRole || !data.unionId || !requestStation) {
+        return { ok: false as const, error: "bad_request" };
+      }
       const { data: request, error: requestError } = await db.from("staff_registration_requests")
         .select("id, full_name, phone, role, union_name, upazila_id")
         .eq("id", data.registrationRequestId)
         .eq("status", "pending")
+        .eq("upazila_id", data.upazilaId)
+        .eq("union_name", requestStation.en)
         .maybeSingle();
       if (requestError) {
         console.error("Could not verify staff registration request", requestError.message);
@@ -537,7 +547,7 @@ export const createStaff = createServerFn({ method: "POST" })
         request.full_name !== data.nameEn.trim() ||
         request.phone !== normalizePhone(data.contact) ||
         request.upazila_id !== data.upazilaId ||
-        request.union_name !== MONIRAMPUR_STATIONS.find((item) => item.id === data.unionId)?.en
+        request.union_name !== requestStation.en
       ) {
         return { ok: false as const, error: "bad_request" };
       }
@@ -591,9 +601,9 @@ export const createStaff = createServerFn({ method: "POST" })
       mobile: fieldRole ? normalizePhone(data.contact) : null, email: fieldRole ? null : data.contact.toLowerCase(),
       upazila_id: data.upazilaId, union_id: data.role === "uno" ? null : data.unionId ?? null,
       ward: fieldRole ? data.ward ?? 1 : null,
-      active: data.role === "uno",
-      status: data.role === "uno" ? "active" : "pending",
-      approval_status: data.role === "uno" ? "approved" : "pending",
+      active: true,
+      status: "active",
+      approval_status: "approved",
     });
     if (pe) {
       const { error: cleanupError } = await db.auth.admin.deleteUser(uid);
@@ -626,7 +636,7 @@ export const createStaff = createServerFn({ method: "POST" })
     if (registrationRequestId) {
       const { error: requestUpdateError } = await db.from("staff_registration_requests")
         .update({
-          status: "provisioned",
+          status: "approved",
           processing_by: null,
           processing_at: null,
           reviewed_by: context.userId,
@@ -646,13 +656,17 @@ export const createStaff = createServerFn({ method: "POST" })
     const { error: auditError } = await db.from("audit_logs").insert({
       user_id: context.userId,
       action: `staff:create:${data.role}`,
-      details: { new_user: uid, approval_status: data.role === "uno" ? "approved" : "pending" },
+      details: {
+        new_user: uid,
+        approval_status: "approved",
+        ...(registrationRequestId ? { request_id: registrationRequestId } : {}),
+      },
     });
     if (auditError) {
       console.error("Staff account created but audit logging failed", auditError.message);
       return { ok: true as const, warning: "audit_failed" };
     }
-    return { ok: true as const, approvalStatus: data.role === "uno" ? "approved" as const : "pending" as const };
+    return { ok: true as const, approvalStatus: "approved" as const };
   });
 
 export const rejectStaffRegistrationRequest = createServerFn({ method: "POST" })
@@ -668,22 +682,33 @@ export const rejectStaffRegistrationRequest = createServerFn({ method: "POST" })
       console.error("Could not verify registration-request reviewer role", rolesError.message);
       return { ok: false as const, error: "unavailable" };
     }
-    if (roles?.length !== 1 || roles[0]?.role !== "uno") {
+    if (roles?.length !== 1 || roles[0]?.role !== "admin") {
       return { ok: false as const, error: "forbidden" };
     }
     const { data: officer, error: officerError } = await context.supabase.from("profiles")
-      .select("active, status, approval_status, upazila_id")
+      .select("active, status, approval_status, upazila_id, union_id, station_id")
       .eq("id", context.userId)
       .maybeSingle();
     if (officerError) {
       console.error("Could not load registration-request reviewer scope", officerError.message);
       return { ok: false as const, error: "unavailable" };
     }
-    if (!officer?.active || officer.status !== "active" || officer.approval_status !== "approved" || !officer.upazila_id) {
+    if (
+      !officer?.active ||
+      officer.status !== "active" ||
+      officer.approval_status !== "approved" ||
+      !officer.upazila_id ||
+      !officer.union_id ||
+      officer.station_id !== officer.union_id
+    ) {
       return { ok: false as const, error: "forbidden" };
     }
 
     const db = await admin();
+    const assignedStation = MONIRAMPUR_STATIONS.find(
+      (station) => station.id === officer.station_id && station.type === "union",
+    );
+    if (!assignedStation) return { ok: false as const, error: "forbidden" };
     const { data: rejected, error: rejectError } = await db.from("staff_registration_requests")
       .update({
         status: "rejected",
@@ -695,6 +720,7 @@ export const rejectStaffRegistrationRequest = createServerFn({ method: "POST" })
       .eq("id", data.requestId)
       .eq("status", "pending")
       .eq("upazila_id", officer.upazila_id)
+      .eq("union_name", assignedStation.en)
       .select("id")
       .maybeSingle();
     if (rejectError) {

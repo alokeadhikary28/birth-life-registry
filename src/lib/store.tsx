@@ -357,10 +357,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       })));
       const upazilas: Upazila[] = (ups.data ?? []).map((u) => ({ id: u.id, bn: u.bn, en: u.en, districtBn: u.district_bn, districtEn: u.district_en,
         divisionBn: u.division_bn, divisionEn: u.division_en, unions: u.unions as unknown as Union[] }));
-      const users: User[] = (profs.data ?? []).map((p) => ({ id: p.id, name: { bn: p.name_bn, en: p.name_en },
-        role: (roles.data ?? []).find((r) => r.user_id === p.id)?.role ?? "worker",
-        mobile: p.mobile ?? undefined, email: p.email ?? undefined, upazilaId: p.upazila_id ?? "",
-        stationId: p.station_id ?? p.union_id ?? undefined, unionId: p.union_id ?? undefined, ward: p.ward ?? undefined }));
+      const users: User[] = (profs.data ?? []).flatMap((p) => {
+        const role = (roles.data ?? []).find((r) => r.user_id === p.id)?.role;
+        if (
+          role !== undefined &&
+          role !== "worker" &&
+          role !== "admin" &&
+          role !== "police" &&
+          role !== "uno" &&
+          role !== "super" &&
+          role !== "district"
+        ) return [];
+        return [{
+          id: p.id,
+          name: { bn: p.name_bn, en: p.name_en },
+          role: role ?? "worker",
+          mobile: p.mobile ?? undefined,
+          email: p.email ?? undefined,
+          upazilaId: p.upazila_id ?? "",
+          stationId: p.station_id ?? p.union_id ?? undefined,
+          unionId: p.union_id ?? undefined,
+          ward: p.ward ?? undefined,
+        }];
+      });
       setCaseLoadError(null);
       const upazilasWithSavedVillages = applySavedUnionVillages(upazilas);
       setState((current) => ({

@@ -29,6 +29,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PasswordLoginForm } from "@/components/PasswordLoginForm";
 import { roleLabel, useApp } from "@/lib/store";
 import { getStationsForUpazila, MONIRAMPUR_STATIONS } from "@/lib/monirampur-stations";
 import {
@@ -40,8 +41,6 @@ import {
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  passwordSignIn,
-  requestPasswordReset,
   sendPhoneOtp,
   submitStaffRegistrationRequest,
   verifyPhoneOtp,
@@ -459,10 +458,8 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
   const { L, n, demoLoginAvailable, enterDemoLogin } = useApp();
   const nav = useNavigate();
   const sendOtp = useServerFn(sendPhoneOtp), verifyOtp = useServerFn(verifyPhoneOtp);
-  const pwSignIn = useServerFn(passwordSignIn), reset = useServerFn(requestPasswordReset);
   const submitRegistrationRequest = useServerFn(submitStaffRegistrationRequest);
   const [mobile, setMobile] = useState(""); const [otp, setOtp] = useState(""); const [sent, setSent] = useState(false);
-  const [email, setEmail] = useState(""); const [pw, setPw] = useState(""); const [forgot, setForgot] = useState(false);
   const [fullName, setFullName] = useState("");
   const [requestMobile, setRequestMobile] = useState("");
   const [requestRole, setRequestRole] = useState<"worker" | "police">("worker");
@@ -487,7 +484,7 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
   const done = async (tokens: { access_token: string; refresh_token: string }) => {
     const { error } = await supabase.auth.setSession(tokens);
     if (error) { toast.error(error.message); return; }
-    onClose(); setSent(false); setOtp(""); setPw(""); nav({ to: "/dashboard" });
+    onClose(); setSent(false); setOtp(""); nav({ to: "/dashboard" });
   };
   const enterLocalRolePreview = (role: "worker" | "police" | "admin" | "uno") => {
     enterDemoLogin(role);
@@ -587,28 +584,15 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
               )}
             </>}
           </TabsContent>
-          <TabsContent value="pw" className="space-y-3 pt-2">
-            {forgot ? (<>
-              <Label>{L("ইমেইল", "Email")}</Label>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-              <Button className="w-full" disabled={busy} onClick={() => run(async () => {
-                await reset({ data: { email } });
-                toast.success(L("অ্যাকাউন্ট থাকলে একটি রিসেট লিংক পাঠানো হয়েছে (১ ঘণ্টা মেয়াদি)", "If the account exists, a reset link was sent (valid 1 hour)"));
-                setForgot(false);
-              })}>{L("রিসেট লিংক পাঠান", "Send reset link")}</Button>
-              <button className="text-sm text-primary underline" onClick={() => setForgot(false)}>{L("ফিরে যান", "Back")}</button>
-            </>) : (<>
+          <TabsContent value="pw" className="pt-2">
+            <>
               <p className="text-xs text-muted-foreground">{L("প্রশাসনিক কর্মকর্তা, ইউএনও ও সুপার অ্যাডমিনের জন্য", "For Admin Officers, UNOs & Super Admins")}</p>
-              <Label>{L("ইমেইল", "Email")}</Label>
-              <Input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />
-              <Label>{L("পাসওয়ার্ড", "Password")}</Label>
-              <Input type="password" autoComplete="current-password" value={pw} onChange={(e) => setPw(e.target.value)} />
-              <Button className="w-full" disabled={busy || !email || !pw} onClick={() => run(async () => {
-                setLoginMessage(null);
-                const r = await pwSignIn({ data: { email, password: pw } }); if (r.ok) await done(r.tokens); else fail(r);
-              })}>{L("লগইন", "Login")}</Button>
-              <button className="text-sm text-primary underline" onClick={() => setForgot(true)}>{L("পাসওয়ার্ড ভুলে গেছেন?", "Forgot password?")}</button>
-            </>)}
+              <PasswordLoginForm
+                onAuthenticated={done}
+                onFailure={fail}
+                onStart={() => setLoginMessage(null)}
+              />
+            </>
           </TabsContent>
             </Tabs>
           </TabsContent>

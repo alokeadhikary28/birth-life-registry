@@ -253,6 +253,20 @@
       "when": 1793367200000,
       "tag": "0035_staff_registration_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794000000000,
+      "tag": "0036_single_tier_staff_approval",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1794000100000,
+      "tag": "0037_email_staff_registration",
+      "breakpoints": true
     }
   ]
 }

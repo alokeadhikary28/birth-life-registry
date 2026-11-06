@@ -18,7 +18,7 @@ function ApprovalRoute() {
   const { L, user } = useApp();
   return (
     <DashboardGate>
-      {user?.role === "admin" || user?.role === "uno" ? (
+      {user?.role === "admin" ? (
         <ApprovalManagement />
       ) : (
         <main className="mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8">

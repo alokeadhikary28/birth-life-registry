@@ -338,43 +338,46 @@ export type Database = {
       staff_registration_requests: {
         Row: {
           created_at: string
+          email: string | null
           full_name: string
           id: string
-          phone: string
+          phone: string | null
           processing_at: string | null
           processing_by: string | null
-          role: string
+          role: "worker" | "police"
           reviewed_at: string | null
           reviewed_by: string | null
-          status: string
+          status: "pending" | "processing" | "provisioned" | "approved" | "rejected"
           union_name: string
           upazila_id: string
         }
         Insert: {
           created_at?: string
+          email?: string | null
           full_name: string
           id?: string
-          phone: string
+          phone?: string | null
           processing_at?: string | null
           processing_by?: string | null
-          role: string
+          role: "worker" | "police"
           reviewed_at?: string | null
           reviewed_by?: string | null
-          status?: string
+          status?: "pending" | "processing" | "provisioned" | "approved" | "rejected"
           union_name: string
           upazila_id: string
         }
         Update: {
           created_at?: string
+          email?: string | null
           full_name?: string
           id?: string
-          phone?: string
+          phone?: string | null
           processing_at?: string | null
           processing_by?: string | null
-          role?: string
+          role?: "worker" | "police"
           reviewed_at?: string | null
           reviewed_by?: string | null
-          status?: string
+          status?: "pending" | "processing" | "provisioned" | "approved" | "rejected"
           union_name?: string
           upazila_id?: string
         }

@@ -267,6 +267,13 @@
       "when": 1794000100000,
       "tag": "0037_email_staff_registration",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794000200000,
+      "tag": "0038_staff_registration_request_metadata",
+      "breakpoints": true
     }
   ]
 }

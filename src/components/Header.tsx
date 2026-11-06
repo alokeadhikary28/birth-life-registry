@@ -30,6 +30,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PasswordLoginForm } from "@/components/PasswordLoginForm";
+import Register from "@/components/Register";
 import { roleLabel, useApp } from "@/lib/store";
 import { getStationsForUpazila, MONIRAMPUR_STATIONS } from "@/lib/monirampur-stations";
 import {
@@ -42,7 +43,6 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import {
   sendPhoneOtp,
-  submitStaffRegistrationRequest,
   verifyPhoneOtp,
 } from "@/lib/auth.functions";
 
@@ -458,13 +458,7 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
   const { L, n, demoLoginAvailable, enterDemoLogin } = useApp();
   const nav = useNavigate();
   const sendOtp = useServerFn(sendPhoneOtp), verifyOtp = useServerFn(verifyPhoneOtp);
-  const submitRegistrationRequest = useServerFn(submitStaffRegistrationRequest);
   const [mobile, setMobile] = useState(""); const [otp, setOtp] = useState(""); const [sent, setSent] = useState(false);
-  const [fullName, setFullName] = useState("");
-  const [requestEmail, setRequestEmail] = useState("");
-  const [requestRole, setRequestRole] = useState<"worker" | "police">("worker");
-  const [requestUnion, setRequestUnion] = useState("");
-  const [requestSubmitted, setRequestSubmitted] = useState(false);
   const [loginMessage, setLoginMessage] = useState<"pending" | "rejected" | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -503,15 +497,6 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
       setBusy(false);
     }
   };
-
-  useEffect(() => {
-    if (!open) {
-      setRequestSubmitted(false);
-      setFullName("");
-      setRequestEmail("");
-      setRequestUnion("");
-    }
-  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -609,153 +594,7 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
             </Tabs>
           </TabsContent>
           <TabsContent value="register" className="space-y-3 pt-2">
-            {requestSubmitted ? (
-              <div
-                className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-950"
-                role="status"
-                aria-live="polite"
-              >
-                {L(
-                  "আপনার অনুরোধ জমা হয়েছে। অ্যাডমিন অনুমোদনের পর ইমেইলে পাসওয়ার্ড সেট করার লিংক পাবেন।",
-                  "Your request was submitted. After admin approval, you’ll receive an email link to set your password.",
-                )}
-              </div>
-            ) : (
-              <form
-                className="space-y-3"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void run(async () => {
-                    let result: Awaited<ReturnType<typeof submitRegistrationRequest>>;
-                    try {
-                      result = await submitRegistrationRequest({
-                        data: {
-                          fullName: fullName.trim(),
-                          email: requestEmail.trim(),
-                          role: requestRole,
-                          unionId: requestUnion,
-                        },
-                      });
-                    } catch (err) {
-                      console.error("Could not submit staff registration request", err);
-                      toast.error(
-                        L(
-                          "অনুরোধ জমা দেওয়া যায়নি। পরে আবার চেষ্টা করুন",
-                          "Could not submit the request. Please try again later",
-                        ),
-                      );
-                      return;
-                    }
-                    if (!result.ok) {
-                      toast.error(
-                        result.error === "unavailable" && result.debugMessage
-                          ? result.debugMessage
-                          : result.error === "bad_union"
-                            ? L("সঠিক ইউনিয়ন বেছে নিন", "Select a valid union")
-                            : result.error === "duplicate"
-                              ? L(
-                                  "এই ইমেইল দিয়ে একটি অনুরোধ ইতিমধ্যে জমা হয়েছে",
-                                  "A request with this email has already been submitted",
-                                )
-                              : result.error === "too_many"
-                                ? L(
-                                    "অনেকবার অনুরোধ করা হয়েছে। পরে আবার চেষ্টা করুন",
-                                    "Too many requests. Please try again later",
-                                  )
-                                : L(
-                                    "অনুরোধ জমা দেওয়া যায়নি। পরে আবার চেষ্টা করুন",
-                                    "Could not submit the request. Please try again later",
-                                  ),
-                      );
-                      return;
-                    }
-                    setRequestSubmitted(true);
-                    setFullName("");
-                    setRequestEmail("");
-                    setRequestUnion("");
-                    toast.success(
-                      L("নিবন্ধনের অনুরোধ জমা হয়েছে", "Registration request submitted"),
-                    );
-                  });
-                }}
-              >
-                <p className="text-xs text-muted-foreground">
-                  {L(
-                    "নাম, ইমেইল, ভূমিকা ও ইউনিয়ন দিয়ে আবেদন করুন। অ্যাডমিন অনুমোদনের পর ইমেইলে পাসওয়ার্ড সেট করার লিংক পাবেন।",
-                    "Apply with your name, email, role, and union. After admin approval, you’ll receive an email link to set your password.",
-                  )}
-                </p>
-                <div className="space-y-1">
-                  <Label htmlFor="registration-full-name">{L("পূর্ণ নাম", "Full name")}</Label>
-                  <Input
-                    id="registration-full-name"
-                    autoComplete="name"
-                    maxLength={100}
-                    value={fullName}
-                    onChange={(event) => setFullName(event.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="registration-email">
-                    {L("ইমেইল (লগইন আইডি)", "Email (login ID)")}
-                  </Label>
-                  <Input
-                    id="registration-email"
-                    type="email"
-                    autoComplete="email"
-                    maxLength={255}
-                    placeholder="name@example.com"
-                    value={requestEmail}
-                    onChange={(event) => setRequestEmail(event.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>{L("যে ভূমিকার জন্য আবেদন", "Role requested")}</Label>
-                  <Select
-                    value={requestRole}
-                    onValueChange={(value) => {
-                      if (value === "worker" || value === "police") setRequestRole(value);
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="worker">{L("স্বাস্থ্যকর্মী", "Health Worker")}</SelectItem>
-                      <SelectItem value="police">{L("গ্রাম পুলিশ", "Gram Police")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label>{L("ইউনিয়ন", "Union")}</Label>
-                  <Select value={requestUnion} onValueChange={setRequestUnion}>
-                    <SelectTrigger>
-                      <SelectValue placeholder={L("ইউনিয়ন বেছে নিন", "Select your union")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {MONIRAMPUR_STATIONS.filter((station) => station.type === "union").map(
-                        (station) => (
-                          <SelectItem key={station.id} value={station.id}>
-                            {L(station.bn, station.en)}
-                          </SelectItem>
-                        ),
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={busy || !fullName.trim() || !requestEmail.trim() || !requestUnion}
-                >
-                  {busy
-                    ? L("জমা হচ্ছে…", "Submitting…")
-                    : L("নিবন্ধনের অনুরোধ পাঠান", "Submit registration request")}
-                </Button>
-              </form>
-            )}
+            <Register />
           </TabsContent>
         </Tabs>
         {demoLoginAvailable && (

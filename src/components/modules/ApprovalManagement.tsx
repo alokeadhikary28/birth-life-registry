@@ -13,7 +13,13 @@ import {
 } from "@/lib/auth.functions";
 import { useApp } from "@/lib/store";
 
-type StaffRole = "worker" | "police";
+type FieldStaffRole = "worker" | "police";
+type StaffRole = FieldStaffRole | "admin" | "uno";
+type RegistrationCategory =
+  | "স্বাস্থ্যকর্মী"
+  | "গ্রাম পুলিশ"
+  | "ইউপি প্রশাসনিক কর্মকর্তা"
+  | "উচ্চপর্যায়ের নির্বাহী প্যানেল";
 
 type Applicant = {
   id: string;
@@ -21,7 +27,7 @@ type Applicant = {
   nameEn: string;
   email: string | null;
   mobile: string | null;
-  role: StaffRole;
+  role: FieldStaffRole;
   createdAt: string;
 };
 
@@ -31,13 +37,19 @@ type RegistrationRequest = {
   email: string | null;
   mobile: string | null;
   role: StaffRole;
+  category: RegistrationCategory;
+  officeName: string | null;
+  upazilaId: string;
   unionId: string;
   unionName: string;
   createdAt: string;
 };
 
 function roleName(role: StaffRole, L: (bn: string, en: string) => string) {
-  return role === "worker" ? L("স্বাস্থ্যকর্মী", "Health Worker") : L("গ্রাম পুলিশ", "Gram Police");
+  if (role === "worker") return L("স্বাস্থ্যকর্মী", "Health Worker");
+  if (role === "police") return L("গ্রাম পুলিশ", "Gram Police");
+  if (role === "admin") return L("ইউপি প্রশাসনিক কর্মকর্তা", "UP Administrative Officer");
+  return L("উচ্চপর্যায়ের নির্বাহী প্যানেল", "Executive Panel");
 }
 
 export function ApprovalManagement() {
@@ -51,6 +63,7 @@ export function ApprovalManagement() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const isSuperAdmin = user?.role === "super";
   const upazila = state.upazilas.find((item) => item.id === user?.upazilaId);
   const assignedUnion = upazila?.unions.find(
     (item) => item.id === (user?.stationId ?? user?.unionId),
@@ -82,7 +95,14 @@ export function ApprovalManagement() {
         setRequests(
           result.requests.filter(
             (request): request is RegistrationRequest =>
-              (request.role === "worker" || request.role === "police") &&
+              (request.role === "worker" ||
+                request.role === "police" ||
+                request.role === "admin" ||
+                request.role === "uno") &&
+              (request.category === "স্বাস্থ্যকর্মী" ||
+                request.category === "গ্রাম পুলিশ" ||
+                request.category === "ইউপি প্রশাসনিক কর্মকর্তা" ||
+                request.category === "উচ্চপর্যায়ের নির্বাহী প্যানেল") &&
               typeof request.unionId === "string",
           ),
         );
@@ -112,7 +132,7 @@ export function ApprovalManagement() {
           nameBn: request.fullName,
           nameEn: request.fullName,
           contact: request.email ?? request.mobile ?? "",
-          upazilaId: user.upazilaId,
+          upazilaId: request.upazilaId,
           unionId: request.unionId,
           ward: 1,
           registrationRequestId: request.id,
@@ -245,8 +265,12 @@ export function ApprovalManagement() {
       <PageTitle
         title={L("অনুমোদন ব্যবস্থাপনা", "Staff approval")}
         sub={L(
-          `আপনার ইউনিয়ন${assignedUnion ? ` · ${assignedUnion.bn}` : ""} এর অপেক্ষমাণ কর্মী নিবন্ধন`,
-          `Pending staff registrations${assignedUnion ? ` · ${assignedUnion.en}` : ""}`,
+          isSuperAdmin
+            ? "সকল এলাকার অপেক্ষমাণ কর্মী নিবন্ধন"
+            : `আপনার ইউনিয়ন${assignedUnion ? ` · ${assignedUnion.bn}` : ""} এর অপেক্ষমাণ কর্মী নিবন্ধন`,
+          isSuperAdmin
+            ? "Pending staff registrations from all areas"
+            : `Pending staff registrations${assignedUnion ? ` · ${assignedUnion.en}` : ""}`,
         )}
         actions={
           <Button variant="outline" onClick={() => void refreshApplicants()} disabled={loading}>
@@ -275,8 +299,12 @@ export function ApprovalManagement() {
       ) : applicants.length === 0 && requests.length === 0 ? (
         <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground">
           {L(
-            "আপনার ইউনিয়নে অপেক্ষমাণ কর্মী নিবন্ধন নেই",
-            "There are no pending staff registrations in your union",
+            isSuperAdmin
+              ? "অপেক্ষমাণ নিবন্ধনের অনুরোধ নেই"
+              : "আপনার ইউনিয়নে অপেক্ষমাণ কর্মী নিবন্ধন নেই",
+            isSuperAdmin
+              ? "There are no pending registration requests"
+              : "There are no pending staff registrations in your union",
           )}
         </div>
       ) : (
@@ -289,8 +317,11 @@ export function ApprovalManagement() {
               <div className="min-w-0">
                 <h2 className="font-semibold">{request.fullName}</h2>
                 <p className="text-sm text-muted-foreground">
-                  {roleName(request.role, L)} · {request.unionName}
+                  {request.category} · {roleName(request.role, L)} · {request.unionName}
                 </p>
+                {request.officeName && (
+                  <p className="text-sm text-muted-foreground">{request.officeName}</p>
+                )}
                 <p className="break-all text-sm">{request.email ?? request.mobile}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {L("আবেদনের তারিখ", "Submitted")} ·{" "}

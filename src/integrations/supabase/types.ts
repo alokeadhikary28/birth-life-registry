@@ -337,14 +337,20 @@ export type Database = {
       }
       staff_registration_requests: {
         Row: {
+          category:
+            | "স্বাস্থ্যকর্মী"
+            | "গ্রাম পুলিশ"
+            | "ইউপি প্রশাসনিক কর্মকর্তা"
+            | "উচ্চপর্যায়ের নির্বাহী প্যানেল"
           created_at: string
           email: string | null
           full_name: string
           id: string
+          office_name: string | null
           phone: string | null
           processing_at: string | null
           processing_by: string | null
-          role: "worker" | "police"
+          role: "worker" | "police" | "admin" | "uno"
           reviewed_at: string | null
           reviewed_by: string | null
           status: "pending" | "processing" | "provisioned" | "approved" | "rejected"
@@ -352,14 +358,20 @@ export type Database = {
           upazila_id: string
         }
         Insert: {
+          category:
+            | "স্বাস্থ্যকর্মী"
+            | "গ্রাম পুলিশ"
+            | "ইউপি প্রশাসনিক কর্মকর্তা"
+            | "উচ্চপর্যায়ের নির্বাহী প্যানেল"
           created_at?: string
           email?: string | null
           full_name: string
           id?: string
+          office_name?: string | null
           phone?: string | null
           processing_at?: string | null
           processing_by?: string | null
-          role: "worker" | "police"
+          role: "worker" | "police" | "admin" | "uno"
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: "pending" | "processing" | "provisioned" | "approved" | "rejected"
@@ -367,14 +379,20 @@ export type Database = {
           upazila_id: string
         }
         Update: {
+          category?:
+            | "স্বাস্থ্যকর্মী"
+            | "গ্রাম পুলিশ"
+            | "ইউপি প্রশাসনিক কর্মকর্তা"
+            | "উচ্চপর্যায়ের নির্বাহী প্যানেল"
           created_at?: string
           email?: string | null
           full_name?: string
           id?: string
+          office_name?: string | null
           phone?: string | null
           processing_at?: string | null
           processing_by?: string | null
-          role?: "worker" | "police"
+          role?: "worker" | "police" | "admin" | "uno"
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: "pending" | "processing" | "provisioned" | "approved" | "rejected"

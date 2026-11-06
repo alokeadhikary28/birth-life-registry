@@ -68,63 +68,89 @@ export const listPendingStaff = createServerFn({ method: "GET" })
       return { ok: false as const, error: "unavailable" };
     }
     const roleList = (roles ?? []).map((item) => item.role);
-    if (roleList.length !== 1 || roleList[0] !== "admin") {
+    const isSuperAdmin = roleList.length === 1 && roleList[0] === "super";
+    const isUnionAdmin = roleList.length === 1 && roleList[0] === "admin";
+    if (!isSuperAdmin && !isUnionAdmin) {
       return { ok: false as const, error: "forbidden" };
     }
 
     const db = await admin();
-    const { data: officer, error: officerError } = await db.from("profiles")
-      .select("active, status, approval_status, upazila_id, union_id, station_id").eq("id", context.userId).maybeSingle();
-    if (officerError) {
-      console.error("Could not load approval officer scope", officerError.message);
-      return { ok: false as const, error: "unavailable" };
+    let upazilaId: string | null = null;
+    let unionName: string | null = null;
+    let assignedUnionId: string | null = null;
+    if (isUnionAdmin) {
+      const { data: officer, error: officerError } = await db.from("profiles")
+        .select("active, status, approval_status, upazila_id, union_id, station_id").eq("id", context.userId).maybeSingle();
+      if (officerError) {
+        console.error("Could not load approval officer scope", officerError.message);
+        return { ok: false as const, error: "unavailable" };
+      }
+      if (
+        !officer?.active ||
+        officer.status !== "active" ||
+        officer.approval_status !== "approved" ||
+        !officer.upazila_id ||
+        !officer.union_id ||
+        officer.station_id !== officer.union_id
+      ) {
+        return { ok: false as const, error: "forbidden" };
+      }
+      const assignedStation = MONIRAMPUR_STATIONS.find(
+        (station) => station.id === officer.station_id && station.type === "union",
+      );
+      if (!assignedStation) return { ok: false as const, error: "forbidden" };
+      upazilaId = officer.upazila_id;
+      unionName = assignedStation.en;
+      assignedUnionId = officer.union_id;
     }
-    if (
-      !officer?.active ||
-      officer.status !== "active" ||
-      officer.approval_status !== "approved" ||
-      !officer.upazila_id ||
-      !officer.union_id ||
-      officer.station_id !== officer.union_id
-    ) {
-      return { ok: false as const, error: "forbidden" };
-    }
-    const assignedUnionId = officer.union_id;
-
-    const assignedStation = MONIRAMPUR_STATIONS.find(
-      (station) => station.id === officer.station_id && station.type === "union",
-    );
-    if (!assignedStation) return { ok: false as const, error: "forbidden" };
 
     const staleProcessingBefore = new Date(Date.now() - 10 * 60_000).toISOString();
-    const { error: recoverError } = await db.from("staff_registration_requests")
+    let recoverQuery = db.from("staff_registration_requests")
       .update({ status: "pending", processing_by: null, processing_at: null })
       .eq("status", "processing")
-      .eq("upazila_id", officer.upazila_id)
-      .eq("union_name", assignedStation.en)
       .lt("processing_at", staleProcessingBefore);
+    if (upazilaId && unionName) {
+      recoverQuery = recoverQuery.eq("upazila_id", upazilaId).eq("union_name", unionName);
+    }
+    const { error: recoverError } = await recoverQuery;
     if (recoverError) {
       console.error("Could not recover interrupted registration requests", recoverError.message);
       return { ok: false as const, error: "unavailable" };
     }
 
-    const { data: profiles, error: pendingError } = await db.from("profiles")
-      .select("id, name_bn, name_en, email, mobile, created_at")
-      .eq("approval_status", "pending")
-      .eq("upazila_id", officer.upazila_id)
-      .eq("station_id", officer.station_id)
-      .eq("union_id", officer.union_id)
-      .order("created_at", { ascending: true });
-    if (pendingError) {
-      console.error("Could not load pending staff registrations", pendingError.message);
-      return { ok: false as const, error: "unavailable" };
+    let profiles: {
+      id: string;
+      name_bn: string;
+      name_en: string;
+      email: string | null;
+      mobile: string | null;
+      created_at: string;
+    }[] = [];
+    if (isUnionAdmin && upazilaId) {
+      const { data, error: pendingError } = await db.from("profiles")
+        .select("id, name_bn, name_en, email, mobile, created_at")
+        .eq("approval_status", "pending")
+        .eq("upazila_id", upazilaId)
+        .eq("station_id", assignedUnionId!)
+        .eq("union_id", assignedUnionId!)
+        .order("created_at", { ascending: true });
+      if (pendingError) {
+        console.error("Could not load pending staff registrations", pendingError.message);
+        return { ok: false as const, error: "unavailable" };
+      }
+      profiles = data ?? [];
     }
 
-    const { data: registrationRequests, error: requestsError } = await db.from("staff_registration_requests")
-      .select("id, full_name, email, phone, role, union_name, created_at")
-      .eq("status", "pending")
-      .eq("upazila_id", officer.upazila_id)
-      .eq("union_name", assignedStation.en)
+    let requestsQuery = db.from("staff_registration_requests")
+      .select("id, full_name, email, phone, role, union_name, upazila_id, office_name, category, created_at")
+      .eq("status", "pending");
+    if (upazilaId && unionName) {
+      requestsQuery = requestsQuery.eq("upazila_id", upazilaId).eq("union_name", unionName);
+    }
+    if (isUnionAdmin) {
+      requestsQuery = requestsQuery.in("role", ["worker", "police"]);
+    }
+    const { data: registrationRequests, error: requestsError } = await requestsQuery
       .order("created_at", { ascending: true });
     if (requestsError) {
       console.error("Could not load staff registration requests", requestsError.message);
@@ -167,20 +193,24 @@ export const listPendingStaff = createServerFn({ method: "GET" })
     return {
       ok: true as const,
       applicants,
-      requests: (registrationRequests ?? []).flatMap((request) =>
-        request.role === "worker" || request.role === "police"
-          ? [{
-              id: request.id,
-              fullName: request.full_name,
-              email: request.email,
-              mobile: request.phone,
-              role: request.role,
-              unionId: assignedUnionId,
-              unionName: request.union_name,
-              createdAt: request.created_at,
-            }]
-          : [],
-      ),
+      requests: (registrationRequests ?? []).map((request) => {
+        const requestStation = MONIRAMPUR_STATIONS.find(
+          (station) => station.en === request.union_name && station.type === "union",
+        );
+        return {
+          id: request.id,
+          fullName: request.full_name,
+          email: request.email,
+          mobile: request.phone,
+          role: request.role,
+          category: request.category,
+          officeName: request.office_name,
+          upazilaId: request.upazila_id,
+          unionId: requestStation?.id ?? (isSuperAdmin ? "" : assignedUnionId ?? ""),
+          unionName: request.union_name,
+          createdAt: request.created_at,
+        };
+      }),
     };
   });
 
@@ -272,12 +302,25 @@ export const submitStaffRegistrationRequest = createServerFn({ method: "POST" })
     fullName: z.string().trim().min(1).max(100),
     email: z.string().trim().toLowerCase().email().max(255),
     mobile: z.string().trim().max(20).optional(),
-    role: z.enum(["worker", "police"]),
+    officeName: z.string().trim().min(1).max(120),
+    category: z.enum([
+      "স্বাস্থ্যকর্মী",
+      "গ্রাম পুলিশ",
+      "ইউপি প্রশাসনিক কর্মকর্তা",
+      "উচ্চপর্যায়ের নির্বাহী প্যানেল",
+    ]),
     unionId: z.string().min(1).max(64),
   }).parse(d))
   .handler(async ({ data }) => {
     const email = data.email.trim().toLowerCase();
     const mobile = data.mobile ? normalizePhone(data.mobile) : null;
+    const roleByCategory = {
+      "স্বাস্থ্যকর্মী": "worker",
+      "গ্রাম পুলিশ": "police",
+      "ইউপি প্রশাসনিক কর্মকর্তা": "admin",
+      "উচ্চপর্যায়ের নির্বাহী প্যানেল": "uno",
+    } as const;
+    const role = roleByCategory[data.category];
     if (data.mobile && !mobile) return { ok: false as const, error: "bad_phone" };
 
     const ip = clientIp();
@@ -317,7 +360,9 @@ export const submitStaffRegistrationRequest = createServerFn({ method: "POST" })
         full_name: data.fullName,
         email,
         phone: mobile,
-        role: data.role,
+        office_name: data.officeName,
+        category: data.category,
+        role,
         union_name: selectedUnion.en,
         upazila_id: "manirampur",
         status: "pending",
@@ -477,15 +522,15 @@ export const createStaff = createServerFn({ method: "POST" })
     const isSuper = roles.length === 1 && roles[0] === "super";
     const isAdmin = roles.length === 1 && roles[0] === "admin";
     const fieldRole = data.role === "worker" || data.role === "police";
-    const isRequestApproval = isAdmin && Boolean(data.registrationRequestId);
+    const isRequestApproval = Boolean(data.registrationRequestId) && (isAdmin || isSuper);
     if ((!isSuper && !isRequestApproval) || (data.registrationRequestId && !isRequestApproval)) {
       return { ok: false as const, error: "forbidden" };
     }
-    if (isRequestApproval && (!fieldRole || !data.unionId)) {
+    if (isRequestApproval && (!data.unionId || (isAdmin && !fieldRole))) {
       return { ok: false as const, error: "bad_request" };
     }
 
-    if (isRequestApproval) {
+    if (isRequestApproval && isAdmin) {
       const { data: me, error: profileError } = await context.supabase
         .from("profiles")
         .select("active, status, approval_status, upazila_id, union_id, station_id")
@@ -533,11 +578,11 @@ export const createStaff = createServerFn({ method: "POST" })
       const requestStation = MONIRAMPUR_STATIONS.find(
         (station) => station.id === data.unionId && station.type === "union",
       );
-      if (!isRequestApproval || !fieldRole || !data.unionId || !requestStation) {
+      if (!isRequestApproval || !data.unionId || !requestStation) {
         return { ok: false as const, error: "bad_request" };
       }
       const { data: request, error: requestError } = await db.from("staff_registration_requests")
-        .select("id, full_name, email, phone, role, union_name, upazila_id")
+        .select("id, full_name, email, phone, role, union_name, upazila_id, category")
         .eq("id", data.registrationRequestId)
         .eq("status", "pending")
         .eq("upazila_id", data.upazilaId)
@@ -550,6 +595,10 @@ export const createStaff = createServerFn({ method: "POST" })
       if (
         !request ||
         request.role !== data.role ||
+        (request.category === "স্বাস্থ্যকর্মী" && data.role !== "worker") ||
+        (request.category === "গ্রাম পুলিশ" && data.role !== "police") ||
+        (request.category === "ইউপি প্রশাসনিক কর্মকর্তা" && data.role !== "admin") ||
+        (request.category === "উচ্চপর্যায়ের নির্বাহী প্যানেল" && data.role !== "uno") ||
         request.full_name !== data.nameEn.trim() ||
         (request.email
           ? request.email !== data.contact.trim().toLowerCase()
@@ -702,34 +751,41 @@ export const rejectStaffRegistrationRequest = createServerFn({ method: "POST" })
       console.error("Could not verify registration-request reviewer role", rolesError.message);
       return { ok: false as const, error: "unavailable" };
     }
-    if (roles?.length !== 1 || roles[0]?.role !== "admin") {
+    const isSuperAdmin = roles?.length === 1 && roles[0]?.role === "super";
+    const isUnionAdmin = roles?.length === 1 && roles[0]?.role === "admin";
+    if (!isSuperAdmin && !isUnionAdmin) {
       return { ok: false as const, error: "forbidden" };
     }
-    const { data: officer, error: officerError } = await context.supabase.from("profiles")
-      .select("active, status, approval_status, upazila_id, union_id, station_id")
-      .eq("id", context.userId)
-      .maybeSingle();
-    if (officerError) {
-      console.error("Could not load registration-request reviewer scope", officerError.message);
-      return { ok: false as const, error: "unavailable" };
-    }
-    if (
-      !officer?.active ||
-      officer.status !== "active" ||
-      officer.approval_status !== "approved" ||
-      !officer.upazila_id ||
-      !officer.union_id ||
-      officer.station_id !== officer.union_id
-    ) {
-      return { ok: false as const, error: "forbidden" };
+    let officerUpazilaId: string | null = null;
+    let assignedStation: (typeof MONIRAMPUR_STATIONS)[number] | undefined;
+    if (isUnionAdmin) {
+      const { data: officer, error: officerError } = await context.supabase.from("profiles")
+        .select("active, status, approval_status, upazila_id, union_id, station_id")
+        .eq("id", context.userId)
+        .maybeSingle();
+      if (officerError) {
+        console.error("Could not load registration-request reviewer scope", officerError.message);
+        return { ok: false as const, error: "unavailable" };
+      }
+      if (
+        !officer?.active ||
+        officer.status !== "active" ||
+        officer.approval_status !== "approved" ||
+        !officer.upazila_id ||
+        !officer.union_id ||
+        officer.station_id !== officer.union_id
+      ) {
+        return { ok: false as const, error: "forbidden" };
+      }
+      officerUpazilaId = officer.upazila_id;
+      assignedStation = MONIRAMPUR_STATIONS.find(
+        (station) => station.id === officer.station_id && station.type === "union",
+      );
+      if (!assignedStation) return { ok: false as const, error: "forbidden" };
     }
 
     const db = await admin();
-    const assignedStation = MONIRAMPUR_STATIONS.find(
-      (station) => station.id === officer.station_id && station.type === "union",
-    );
-    if (!assignedStation) return { ok: false as const, error: "forbidden" };
-    const { data: rejected, error: rejectError } = await db.from("staff_registration_requests")
+    let rejectQuery = db.from("staff_registration_requests")
       .update({
         status: "rejected",
         processing_by: null,
@@ -738,11 +794,14 @@ export const rejectStaffRegistrationRequest = createServerFn({ method: "POST" })
         reviewed_at: new Date().toISOString(),
       })
       .eq("id", data.requestId)
-      .eq("status", "pending")
-      .eq("upazila_id", officer.upazila_id)
-      .eq("union_name", assignedStation.en)
-      .select("id")
-      .maybeSingle();
+      .eq("status", "pending");
+    if (officerUpazilaId && assignedStation) {
+      rejectQuery = rejectQuery
+        .eq("upazila_id", officerUpazilaId)
+        .eq("union_name", assignedStation.en)
+        .in("role", ["worker", "police"]);
+    }
+    const { data: rejected, error: rejectError } = await rejectQuery.select("id").maybeSingle();
     if (rejectError) {
       console.error("Could not reject staff registration request", rejectError.message);
       return { ok: false as const, error: "unavailable" };

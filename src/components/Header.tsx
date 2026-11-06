@@ -202,14 +202,14 @@ export function Header() {
     void nav({ to: "/", search: role ? { role } : {} });
   };
   const executiveRoles = [
-    { role: "municipal_executive_officer", bn: "পৌর নির্বাহী কর্মকর্তা", en: "Pourashava Executive Officer (PEO)", Icon: Landmark },
-    { role: "uno", bn: "উপজেলা নির্বাহী অফিসার - UNO", en: "Upazila Nirbahi Officer - UNO", Icon: Building2 },
-    { role: "ddlg", bn: "উপপরিচালক, স্থানীয় সরকার - DDLG", en: "Deputy Director, Local Government - DDLG", Icon: MapPinned },
-    { role: "dc", bn: "জেলা প্রশাসক - DC", en: "District Commissioner - DC", Icon: MapPinned },
-    { role: "addl_registrar_general", bn: "অতিরিক্ত রেজিস্ট্রার জেনারেল", en: "Additional Registrar General", Icon: Award },
-    { role: "city_corporation_ceo", bn: "সিটি কর্পোরেশনের প্রধান নির্বাহী কর্মকর্তা", en: "City Corporation Chief Executive Officer - CEO", Icon: Building2 },
+    { role: "municipal_executive_officer", bn: "পৌর নির্বাহী কর্মকর্তা", en: "Municipal Executive Officer", Icon: Landmark },
+    { role: "uno", bn: "ইউএনও (UNO)", en: "Upazila Nirbahi Officer (UNO)", Icon: Building2 },
+    { role: "ddlg", bn: "ডিডিএলজি (DDLG)", en: "Deputy Director, Local Government (DDLG)", Icon: MapPinned },
+    { role: "dc", bn: "ডিসি (DC)", en: "District Commissioner (DC)", Icon: MapPinned },
+    { role: "addl_registrar_general", bn: "অতিরিক্ত রেজিস্টার জেনারেল", en: "Additional Registrar General", Icon: Award },
+    { role: "city_corporation_ceo", bn: "সিটি কর্পোরেশনের প্রধান নির্বাহী কর্মকর্তা", en: "CEO of City Corporation", Icon: Building2 },
     { role: "divisional_commissioner", bn: "বিভাগীয় কমিশনার", en: "Divisional Commissioner", Icon: ChartNoAxesCombined },
-    { role: "registrar_general", bn: "রেজিস্ট্রার জেনারেল", en: "Registrar General", Icon: ShieldCheck },
+    { role: "registrar_general", bn: "রেজিস্টার জেনারেল", en: "Registrar General", Icon: ShieldCheck },
   ] as const;
   const demoRoleForExecutive: Record<ExecutivePreviewRole, "admin" | "uno"> = {
     municipal_executive_officer: "admin",
@@ -275,7 +275,7 @@ export function Header() {
                   }`}
                 >
                   <ChartNoAxesCombined aria-hidden="true" className="h-4 w-4 shrink-0" />
-                  {L("উচ্চপর্যায়ের নির্বাহী প্যানেল", "Executive Panel")}
+                  {L("উচ্চ পর্যায়ের নির্বাহী প্যানেল", "Higher-Level Executive Panel")}
                   <ChevronDown
                     aria-hidden="true"
                     className={`h-4 w-4 transition-transform duration-200 ${isExecutiveMenuOpen ? "rotate-180" : ""}`}
@@ -285,7 +285,7 @@ export function Header() {
                   <div
                     id="executive-panel-menu"
                     role="menu"
-                    aria-label={L("উচ্চপর্যায়ের নির্বাহী প্যানেল", "Executive Panel")}
+                    aria-label={L("উচ্চ পর্যায়ের নির্বাহী প্যানেল", "Higher-Level Executive Panel")}
                     className="absolute left-0 top-full z-50 mt-2 w-72 rounded-xl border border-emerald-100 bg-white/95 p-2 text-slate-900 shadow-2xl backdrop-blur-md sm:left-auto sm:right-0"
                   >
                     <p className="px-3 py-2 text-xs font-semibold text-slate-500">

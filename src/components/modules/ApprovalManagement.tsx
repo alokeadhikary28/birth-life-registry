@@ -11,15 +11,13 @@ import {
   rejectStaffRegistrationRequest,
   reviewStaffRegistration,
 } from "@/lib/auth.functions";
+import { EXECUTIVE_POSITIONS, type ExecutivePreviewRole } from "@/lib/dashboard-roles";
 import { useApp } from "@/lib/store";
 
 type FieldStaffRole = "worker" | "police";
-type StaffRole = FieldStaffRole | "admin" | "uno";
+type StaffRole = FieldStaffRole | "admin" | "uno" | "district" | "super";
 type RegistrationCategory =
-  | "স্বাস্থ্যকর্মী"
-  | "গ্রাম পুলিশ"
-  | "ইউপি প্রশাসনিক কর্মকর্তা"
-  | "উচ্চপর্যায়ের নির্বাহী প্যানেল";
+  "স্বাস্থ্যকর্মী" | "গ্রাম পুলিশ" | "ইউপি প্রশাসনিক কর্মকর্তা" | "উচ্চ পর্যায়ের নির্বাহী প্যানেল";
 
 type Applicant = {
   id: string;
@@ -38,6 +36,7 @@ type RegistrationRequest = {
   mobile: string | null;
   role: StaffRole;
   category: RegistrationCategory;
+  requestedPosition: ExecutivePreviewRole | null;
   officeName: string | null;
   upazilaId: string;
   unionId: string;
@@ -49,11 +48,11 @@ function roleName(role: StaffRole, L: (bn: string, en: string) => string) {
   if (role === "worker") return L("স্বাস্থ্যকর্মী", "Health Worker");
   if (role === "police") return L("গ্রাম পুলিশ", "Gram Police");
   if (role === "admin") return L("ইউপি প্রশাসনিক কর্মকর্তা", "UP Administrative Officer");
-  return L("উচ্চপর্যায়ের নির্বাহী প্যানেল", "Executive Panel");
+  return L("উচ্চ পর্যায়ের নির্বাহী প্যানেল", "Higher-Level Executive Panel");
 }
 
 export function ApprovalManagement() {
-  const { L, user, state, refresh } = useApp();
+  const { L, user, refresh } = useApp();
   const loadApplicants = useServerFn(listPendingStaff);
   const review = useServerFn(reviewStaffRegistration);
   const provision = useServerFn(createStaff);
@@ -64,10 +63,6 @@ export function ApprovalManagement() {
   const [error, setError] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const isSuperAdmin = user?.role === "super";
-  const upazila = state.upazilas.find((item) => item.id === user?.upazilaId);
-  const assignedUnion = upazila?.unions.find(
-    (item) => item.id === (user?.stationId ?? user?.unionId),
-  );
 
   const refreshApplicants = useCallback(async () => {
     setLoading(true);
@@ -98,11 +93,13 @@ export function ApprovalManagement() {
               (request.role === "worker" ||
                 request.role === "police" ||
                 request.role === "admin" ||
-                request.role === "uno") &&
+                request.role === "uno" ||
+                request.role === "district" ||
+                request.role === "super") &&
               (request.category === "স্বাস্থ্যকর্মী" ||
                 request.category === "গ্রাম পুলিশ" ||
                 request.category === "ইউপি প্রশাসনিক কর্মকর্তা" ||
-                request.category === "উচ্চপর্যায়ের নির্বাহী প্যানেল") &&
+                request.category === "উচ্চ পর্যায়ের নির্বাহী প্যানেল") &&
               typeof request.unionId === "string",
           ),
         );
@@ -264,14 +261,7 @@ export function ApprovalManagement() {
       <ModuleNavigation />
       <PageTitle
         title={L("অনুমোদন ব্যবস্থাপনা", "Staff approval")}
-        sub={L(
-          isSuperAdmin
-            ? "সকল এলাকার অপেক্ষমাণ কর্মী নিবন্ধন"
-            : `আপনার ইউনিয়ন${assignedUnion ? ` · ${assignedUnion.bn}` : ""} এর অপেক্ষমাণ কর্মী নিবন্ধন`,
-          isSuperAdmin
-            ? "Pending staff registrations from all areas"
-            : `Pending staff registrations${assignedUnion ? ` · ${assignedUnion.en}` : ""}`,
-        )}
+        sub={L("সকল এলাকার অপেক্ষমাণ কর্মী নিবন্ধন", "Pending staff registrations from all areas")}
         actions={
           <Button variant="outline" onClick={() => void refreshApplicants()} disabled={loading}>
             <RefreshCw className="mr-2 h-4 w-4" />
@@ -317,7 +307,17 @@ export function ApprovalManagement() {
               <div className="min-w-0">
                 <h2 className="font-semibold">{request.fullName}</h2>
                 <p className="text-sm text-muted-foreground">
-                  {request.category} · {roleName(request.role, L)} · {request.unionName}
+                  {request.category}
+                  {request.requestedPosition && (
+                    <>
+                      {" · "}
+                      {EXECUTIVE_POSITIONS.find(
+                        (position) => position.role === request.requestedPosition,
+                      )?.bn ?? request.requestedPosition}
+                    </>
+                  )}
+                  {" · "}
+                  {roleName(request.role, L)} · {request.unionName}
                 </p>
                 {request.officeName && (
                   <p className="text-sm text-muted-foreground">{request.officeName}</p>

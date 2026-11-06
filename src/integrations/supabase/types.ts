@@ -341,7 +341,7 @@ export type Database = {
             | "স্বাস্থ্যকর্মী"
             | "গ্রাম পুলিশ"
             | "ইউপি প্রশাসনিক কর্মকর্তা"
-            | "উচ্চপর্যায়ের নির্বাহী প্যানেল"
+            | "উচ্চ পর্যায়ের নির্বাহী প্যানেল"
           created_at: string
           email: string | null
           full_name: string
@@ -350,7 +350,17 @@ export type Database = {
           phone: string | null
           processing_at: string | null
           processing_by: string | null
-          role: "worker" | "police" | "admin" | "uno"
+          requested_position:
+            | "municipal_executive_officer"
+            | "uno"
+            | "ddlg"
+            | "dc"
+            | "addl_registrar_general"
+            | "city_corporation_ceo"
+            | "divisional_commissioner"
+            | "registrar_general"
+            | null
+          role: "worker" | "police" | "admin" | "uno" | "district" | "super"
           reviewed_at: string | null
           reviewed_by: string | null
           status: "pending" | "processing" | "provisioned" | "approved" | "rejected"
@@ -362,7 +372,7 @@ export type Database = {
             | "স্বাস্থ্যকর্মী"
             | "গ্রাম পুলিশ"
             | "ইউপি প্রশাসনিক কর্মকর্তা"
-            | "উচ্চপর্যায়ের নির্বাহী প্যানেল"
+            | "উচ্চ পর্যায়ের নির্বাহী প্যানেল"
           created_at?: string
           email?: string | null
           full_name: string
@@ -371,7 +381,17 @@ export type Database = {
           phone?: string | null
           processing_at?: string | null
           processing_by?: string | null
-          role: "worker" | "police" | "admin" | "uno"
+          requested_position?:
+            | "municipal_executive_officer"
+            | "uno"
+            | "ddlg"
+            | "dc"
+            | "addl_registrar_general"
+            | "city_corporation_ceo"
+            | "divisional_commissioner"
+            | "registrar_general"
+            | null
+          role: "worker" | "police" | "admin" | "uno" | "district" | "super"
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: "pending" | "processing" | "provisioned" | "approved" | "rejected"
@@ -383,7 +403,7 @@ export type Database = {
             | "স্বাস্থ্যকর্মী"
             | "গ্রাম পুলিশ"
             | "ইউপি প্রশাসনিক কর্মকর্তা"
-            | "উচ্চপর্যায়ের নির্বাহী প্যানেল"
+            | "উচ্চ পর্যায়ের নির্বাহী প্যানেল"
           created_at?: string
           email?: string | null
           full_name?: string
@@ -392,7 +412,17 @@ export type Database = {
           phone?: string | null
           processing_at?: string | null
           processing_by?: string | null
-          role?: "worker" | "police" | "admin" | "uno"
+          requested_position?:
+            | "municipal_executive_officer"
+            | "uno"
+            | "ddlg"
+            | "dc"
+            | "addl_registrar_general"
+            | "city_corporation_ceo"
+            | "divisional_commissioner"
+            | "registrar_general"
+            | null
+          role?: "worker" | "police" | "admin" | "uno" | "district" | "super"
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: "pending" | "processing" | "provisioned" | "approved" | "rejected"

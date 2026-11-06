@@ -1,6 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { RegistrationDashboard } from "@/components/dashboards/RegistrationDashboard";
-import { isPreviewRole, type PreviewRole } from "@/lib/dashboard-roles";
+import {
+  EXECUTIVE_ROLE_BY_POSITION,
+  isPreviewRole,
+  type PreviewRole,
+} from "@/lib/dashboard-roles";
 import { useApp } from "@/lib/store";
 
 const DASHBOARD_ACTIONS = ["worker-report", "feedback"] as const;
@@ -13,15 +17,8 @@ const roleMap = {
   up_chairman: "admin",
   municipal_secretary: "admin",
   city_zonal_officer: "admin",
-  municipal_executive_officer: "admin",
-  uno: "uno",
-  ddlg: "district",
-  dc: "district",
+  ...EXECUTIVE_ROLE_BY_POSITION,
   ddlg_dc: "district",
-  divisional_commissioner: "district",
-  addl_registrar_general: "super",
-  city_corporation_ceo: "admin",
-  registrar_general: "super",
 } as const satisfies Partial<Record<PreviewRole, "worker" | "police" | "admin" | "uno" | "district" | "super">>;
 
 export const Route = createFileRoute("/")({

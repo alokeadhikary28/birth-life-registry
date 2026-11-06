@@ -11,8 +11,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { submitStaffRegistrationRequest } from "@/lib/auth.functions";
+import { EXECUTIVE_POSITIONS } from "@/lib/dashboard-roles";
 import { MONIRAMPUR_STATIONS } from "@/lib/monirampur-stations";
 import { useApp } from "@/lib/store";
+
+const EXECUTIVE_CATEGORY = "উচ্চ পর্যায়ের নির্বাহী প্যানেল";
 
 const initialForm = {
   fullName: "",
@@ -20,6 +23,7 @@ const initialForm = {
   mobile: "",
   officeName: "",
   category: "স্বাস্থ্যকর্মী",
+  requestedPosition: "",
   unionId: "",
 };
 
@@ -47,6 +51,7 @@ export default function Register() {
           mobile: formData.mobile.trim() || undefined,
           officeName: formData.officeName.trim(),
           category: formData.category,
+          requestedPosition: formData.requestedPosition || undefined,
           unionId: formData.unionId,
         },
       });
@@ -172,7 +177,11 @@ export default function Register() {
           <Select
             value={formData.category}
             onValueChange={(value) => {
-              updateField("category", value);
+              setFormData((current) => ({
+                ...current,
+                category: value,
+                requestedPosition: "",
+              }));
             }}
             disabled={loading}
           >
@@ -185,12 +194,36 @@ export default function Register() {
               <SelectItem value="ইউপি প্রশাসনিক কর্মকর্তা">
                 {L("ইউপি প্রশাসনিক কর্মকর্তা", "UP Administrative Officer")}
               </SelectItem>
-              <SelectItem value="উচ্চপর্যায়ের নির্বাহী প্যানেল">
-                {L("উচ্চপর্যায়ের নির্বাহী প্যানেল", "Executive Panel")}
+              <SelectItem value={EXECUTIVE_CATEGORY}>
+                {L(EXECUTIVE_CATEGORY, "Higher-Level Executive Panel")}
               </SelectItem>
             </SelectContent>
           </Select>
         </div>
+
+        {formData.category === EXECUTIVE_CATEGORY && (
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="registration-position">
+              {L("পদবি", "Position")}
+            </Label>
+            <Select
+              value={formData.requestedPosition}
+              onValueChange={(value) => updateField("requestedPosition", value)}
+              disabled={loading}
+            >
+              <SelectTrigger id="registration-position">
+                <SelectValue placeholder={L("পদবি বেছে নিন", "Select a position")} />
+              </SelectTrigger>
+              <SelectContent>
+                {EXECUTIVE_POSITIONS.map((position) => (
+                  <SelectItem key={position.role} value={position.role}>
+                    {L(position.bn, position.en)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <Label htmlFor="registration-union">{L("ইউনিয়ন", "Union")}</Label>
@@ -235,7 +268,8 @@ export default function Register() {
           !formData.fullName.trim() ||
           !formData.email.trim() ||
           !formData.unionId ||
-          !formData.officeName.trim()
+          !formData.officeName.trim() ||
+          (formData.category === EXECUTIVE_CATEGORY && !formData.requestedPosition)
         }
       >
         {loading

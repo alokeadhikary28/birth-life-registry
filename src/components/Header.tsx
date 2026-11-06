@@ -500,7 +500,7 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-h-[90svh] w-[calc(100%-2rem)] max-w-4xl overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>
             {L("লগইন বা নিবন্ধনের অনুরোধ", "Login or request registration")}
@@ -513,9 +513,19 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
           </DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="login">
-          <TabsList className="grid h-auto w-full grid-cols-2">
-            <TabsTrigger value="login">{L("লগইন", "Login")}</TabsTrigger>
-            <TabsTrigger value="register">{L("নিবন্ধন", "Register")}</TabsTrigger>
+          <TabsList className="grid h-auto w-full grid-cols-2 rounded-xl border border-emerald-100 bg-emerald-50 p-1.5">
+            <TabsTrigger
+              className="h-12 text-lg font-bold text-emerald-900 data-[state=active]:bg-white data-[state=active]:text-emerald-800 data-[state=active]:shadow-md"
+              value="login"
+            >
+              {L("লগইন", "Login")}
+            </TabsTrigger>
+            <TabsTrigger
+              className="h-12 text-lg font-bold text-emerald-900 data-[state=active]:bg-white data-[state=active]:text-emerald-800 data-[state=active]:shadow-md"
+              value="register"
+            >
+              {L("নিবন্ধন", "Register")}
+            </TabsTrigger>
           </TabsList>
           {loginMessage && (
             <div
@@ -533,9 +543,19 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
           )}
           <TabsContent value="login" className="pt-2">
             <Tabs defaultValue="otp">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="otp">{L("মোবাইল ও OTP", "Mobile & OTP")}</TabsTrigger>
-                <TabsTrigger value="pw">{L("পাসওয়ার্ড", "Password")}</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 rounded-lg border border-emerald-100 bg-emerald-50 p-1">
+                <TabsTrigger
+                  className="text-base font-semibold text-emerald-900 data-[state=active]:bg-white data-[state=active]:text-emerald-800 data-[state=active]:shadow-sm"
+                  value="otp"
+                >
+                  {L("মোবাইল ও OTP", "Mobile & OTP")}
+                </TabsTrigger>
+                <TabsTrigger
+                  className="text-base font-semibold text-emerald-900 data-[state=active]:bg-white data-[state=active]:text-emerald-800 data-[state=active]:shadow-sm"
+                  value="pw"
+                >
+                  {L("পাসওয়ার্ড", "Password")}
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="otp" className="space-y-3 pt-2">
             <p className="text-xs text-muted-foreground">{L("স্বাস্থ্যকর্মী ও গ্রাম পুলিশের জন্য", "For Health Workers & Village Police")}</p>
@@ -545,10 +565,10 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
               </p>
             )}
             <Label>{L("মোবাইল নম্বর", "Mobile number")}</Label>
-            <Input inputMode="numeric" maxLength={11} value={mobile} disabled={sent} onChange={(e) => setMobile(e.target.value.replace(/\D/g, ""))} placeholder="017XXXXXXXX" />
+            <Input className="border-slate-300 bg-slate-50 shadow-sm focus-visible:ring-emerald-700" inputMode="numeric" maxLength={11} value={mobile} disabled={sent} onChange={(e) => setMobile(e.target.value.replace(/\D/g, ""))} placeholder="017XXXXXXXX" />
             {sent ? (<>
               <Label>{L("৬ অঙ্কের কোড", "6-digit code")}</Label>
-              <Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} />
+              <Input className="border-slate-300 bg-slate-50 shadow-sm focus-visible:ring-emerald-700" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} />
               <Button className="w-full" disabled={busy || otp.length !== 6} onClick={() => run(async () => {
                 const r = await verifyOtp({ data: { mobile, code: otp } }); if (r.ok) await done(r.tokens); else fail(r);
               })}>{L("যাচাই করুন", "Verify")}</Button>

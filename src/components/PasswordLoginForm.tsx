@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { passwordSignIn, requestPasswordReset } from "@/lib/auth.functions";
 import { useApp } from "@/lib/store";
 
+const fieldClassName = "border-slate-300 bg-slate-50 shadow-sm focus-visible:ring-emerald-700";
+
 type LoginFailure = { error?: string; lockedMinutes?: number };
 type Tokens = { access_token: string; refresh_token: string };
 
@@ -93,6 +95,7 @@ export function PasswordLoginForm({
       <div className="space-y-1.5">
         <Label htmlFor="password-login-email">{L("ইমেইল (লগইন আইডি)", "Email (login ID)")}</Label>
         <Input
+          className={fieldClassName}
           id="password-login-email"
           type="email"
           autoComplete="username"
@@ -111,7 +114,7 @@ export function PasswordLoginForm({
             id="password-login-password"
             type={showPassword ? "text" : "password"}
             autoComplete="current-password"
-            className="pr-11"
+            className={`${fieldClassName} pr-11`}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             required

@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Check, RefreshCw, UserPlus, X } from "lucide-react";
+import { Check, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ModuleNavigation } from "./ModuleNavigation";
 import { PageTitle } from "@/components/shared";
 import { useServerFn } from "@tanstack/react-start";
@@ -13,8 +11,13 @@ import {
   rejectStaffRegistrationRequest,
   reviewStaffRegistration,
 } from "@/lib/auth.functions";
+import { EXECUTIVE_POSITIONS, type ExecutivePreviewRole } from "@/lib/dashboard-roles";
 import { useApp } from "@/lib/store";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+type FieldStaffRole = "worker" | "police";
+type StaffRole = FieldStaffRole | "admin" | "uno" | "district" | "super";
+type RegistrationCategory =
+  "স্বাস্থ্যকর্মী" | "গ্রাম পুলিশ" | "ইউপি প্রশাসনিক কর্মকর্তা" | "উচ্চ পর্যায়ের নির্বাহী প্যানেল";
 
 type Applicant = {
   id: string;
@@ -22,29 +25,34 @@ type Applicant = {
   nameEn: string;
   email: string | null;
   mobile: string | null;
-  role: "worker" | "police" | "admin";
+  role: FieldStaffRole;
   createdAt: string;
 };
 
 type RegistrationRequest = {
   id: string;
   fullName: string;
-  mobile: string;
-  role: "worker" | "police";
+  email: string | null;
+  mobile: string | null;
+  role: StaffRole;
+  category: RegistrationCategory;
+  requestedPosition: ExecutivePreviewRole | null;
+  officeName: string | null;
+  upazilaId: string;
   unionId: string;
+  unionName: string;
   createdAt: string;
 };
 
-type StaffRole = "worker" | "police" | "admin";
-
-function roleName(role: Applicant["role"], L: (bn: string, en: string) => string) {
+function roleName(role: StaffRole, L: (bn: string, en: string) => string) {
   if (role === "worker") return L("স্বাস্থ্যকর্মী", "Health Worker");
   if (role === "police") return L("গ্রাম পুলিশ", "Gram Police");
-  return L("ইউপি প্রশাসনিক কর্মকর্তা", "UP Administrative Officer");
+  if (role === "admin") return L("ইউপি প্রশাসনিক কর্মকর্তা", "UP Administrative Officer");
+  return L("উচ্চ পর্যায়ের নির্বাহী প্যানেল", "Higher-Level Executive Panel");
 }
 
 export function ApprovalManagement() {
-  const { L, user, state, refresh } = useApp();
+  const { L, user, refresh } = useApp();
   const loadApplicants = useServerFn(listPendingStaff);
   const review = useServerFn(reviewStaffRegistration);
   const provision = useServerFn(createStaff);
@@ -54,17 +62,7 @@ export function ApprovalManagement() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [nameBn, setNameBn] = useState("");
-  const [nameEn, setNameEn] = useState("");
-  const [contact, setContact] = useState("");
-  const [unionId, setUnionId] = useState(user?.role === "admin" ? user.stationId ?? user.unionId ?? "" : "");
-  const [ward, setWard] = useState(1);
-  const [role, setRole] = useState<StaffRole>(user?.role === "uno" ? "admin" : "worker");
-  const isAdmin = user?.role === "admin";
-  const upazila = state.upazilas.find((item) => item.id === user?.upazilaId);
-  const assignableRoles: StaffRole[] = user?.role === "uno" ? ["admin", "worker", "police"] : [];
-  const targetUnion = unionId;
+  const isSuperAdmin = user?.role === "super";
 
   const refreshApplicants = useCallback(async () => {
     setLoading(true);
@@ -83,8 +81,28 @@ export function ApprovalManagement() {
               : L("নিবন্ধনের তালিকা লোড করা যায়নি", "Could not load pending registrations"),
         );
       } else {
-        setApplicants(result.applicants);
-        setRequests(result.requests);
+        setApplicants(
+          result.applicants.filter(
+            (applicant): applicant is Applicant =>
+              applicant.role === "worker" || applicant.role === "police",
+          ),
+        );
+        setRequests(
+          result.requests.filter(
+            (request): request is RegistrationRequest =>
+              (request.role === "worker" ||
+                request.role === "police" ||
+                request.role === "admin" ||
+                request.role === "uno" ||
+                request.role === "district" ||
+                request.role === "super") &&
+              (request.category === "স্বাস্থ্যকর্মী" ||
+                request.category === "গ্রাম পুলিশ" ||
+                request.category === "ইউপি প্রশাসনিক কর্মকর্তা" ||
+                request.category === "উচ্চ পর্যায়ের নির্বাহী প্যানেল") &&
+              typeof request.unionId === "string",
+          ),
+        );
       }
     } catch (cause) {
       console.error("Could not load pending registrations", cause);
@@ -101,71 +119,8 @@ export function ApprovalManagement() {
     void refreshApplicants();
   }, [refreshApplicants]);
 
-  const createRegistration = async () => {
-    if (!user || !upazila || !targetUnion || !nameBn.trim() || !contact.trim()) {
-      toast.error(L("নাম, যোগাযোগের তথ্য ও ইউনিয়ন পূরণ করুন", "Enter a name, contact, and union"));
-      return;
-    }
-    if (
-      (role === "worker" || role === "police") &&
-      (!Number.isInteger(ward) || ward < 1 || ward > 9)
-    ) {
-      toast.error(L("১ থেকে ৯-এর মধ্যে ওয়ার্ড নম্বর দিন", "Enter a ward number between 1 and 9"));
-      return;
-    }
-    setCreating(true);
-    try {
-      const result = await provision({
-        data: {
-          role,
-          nameBn: nameBn.trim(),
-          nameEn: nameEn.trim() || nameBn.trim(),
-          contact: contact.trim(),
-          upazilaId: upazila.id,
-          unionId: targetUnion,
-          ...(role === "worker" || role === "police" ? { ward } : {}),
-        },
-      });
-      if (!result.ok) {
-        toast.error(
-          result.error === "mfa_required"
-            ? L("অ্যাকাউন্ট তৈরির জন্য MFA যাচাই করুন", "Verify MFA to create an account")
-            : result.error === "forbidden"
-              ? L("এই ভূমিকা বা এলাকায় অ্যাকাউন্ট তৈরির অনুমতি নেই", "You cannot create this role or area account")
-              : result.error === "bad_phone"
-                ? L("সঠিক মোবাইল নম্বর দিন", "Enter a valid mobile number")
-                : result.error === "bad_email"
-                  ? L("সঠিক ইমেইল ঠিকানা দিন", "Enter a valid email address")
-                  : result.error === "bad_union" || result.error === "union_required"
-                    ? L("বৈধ ইউনিয়ন নির্বাচন করুন", "Select a valid union")
-                    : L("অ্যাকাউন্ট তৈরি করা যায়নি", "Could not create the account"),
-        );
-        return;
-      }
-      toast.success(
-        result.approvalStatus === "approved"
-          ? L("অ্যাকাউন্ট তৈরি ও সক্রিয় হয়েছে", "Account created and activated")
-          : L("অ্যাকাউন্ট তৈরি হয়েছে; অনুমোদনের অপেক্ষায় আছে", "Account created and is awaiting approval"),
-      );
-      if (result.warning === "audit_failed") {
-        toast.error(L("অ্যাকাউন্ট তৈরি হয়েছে, তবে অডিট লগ সংরক্ষণ হয়নি", "Account created, but audit logging failed"));
-      }
-      setNameBn("");
-      setNameEn("");
-      setContact("");
-      if (!isAdmin) setUnionId("");
-      await refreshApplicants();
-      await refresh();
-    } catch (cause) {
-      console.error("Could not create staff account", cause);
-      toast.error(L("অ্যাকাউন্ট তৈরি করা যায়নি", "Could not create the account"));
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const provisionRequest = async (request: RegistrationRequest) => {
-    if (!user || !upazila) return;
+  const approveRequest = async (request: RegistrationRequest) => {
+    if (!user) return;
     setBusyId(request.id);
     try {
       const result = await provision({
@@ -173,8 +128,8 @@ export function ApprovalManagement() {
           role: request.role,
           nameBn: request.fullName,
           nameEn: request.fullName,
-          contact: request.mobile,
-          upazilaId: upazila.id,
+          contact: request.email ?? request.mobile ?? "",
+          upazilaId: request.upazilaId,
           unionId: request.unionId,
           ward: 1,
           registrationRequestId: request.id,
@@ -183,24 +138,45 @@ export function ApprovalManagement() {
       if (!result.ok) {
         toast.error(
           result.error === "mfa_required"
-            ? L("অ্যাকাউন্ট তৈরির জন্য MFA যাচাই করুন", "Verify MFA to create an account")
+            ? L("অনুমোদনের জন্য MFA যাচাই করুন", "Verify MFA to approve this request")
             : result.error === "request_unavailable"
-              ? L("অনুরোধটি ইতিমধ্যে প্রক্রিয়াধীন বা সম্পন্ন হয়েছে", "This request is already being processed or completed")
-              : result.error === "bad_request"
-                ? L("নিবন্ধনের অনুরোধটি যাচাই করা যায়নি", "Could not verify this registration request")
-                : L("অ্যাকাউন্ট তৈরি করা যায়নি", "Could not create the account"),
+              ? L(
+                  "অনুরোধটি ইতিমধ্যে প্রক্রিয়াধীন বা সম্পন্ন হয়েছে",
+                  "This request is already being processed or completed",
+                )
+              : L(
+                  "অ্যাকাউন্ট তৈরি ও সক্রিয় করা যায়নি",
+                  "Could not create and activate the account",
+                ),
         );
         return;
       }
-      toast.success(L("অ্যাকাউন্ট তৈরি হয়েছে; সংশ্লিষ্ট ইউপি কর্মকর্তা অনুমোদন করবেন", "Account created; the responsible UP officer will review it"));
+      toast.success(
+        request.email
+          ? L(
+              "অনুরোধ অনুমোদিত; পাসওয়ার্ড সেট করার লিংক ইমেইলে পাঠানো হয়েছে",
+              "Request approved; a password setup link was sent by email",
+            )
+          : L(
+              "অনুরোধ অনুমোদিত; অ্যাকাউন্ট সক্রিয় হয়েছে",
+              "Request approved; the account is active",
+            ),
+      );
       if (result.warning === "audit_failed") {
-        toast.error(L("অ্যাকাউন্ট তৈরি হয়েছে, তবে অডিট লগ সংরক্ষণ হয়নি", "Account created, but audit logging failed"));
+        toast.error(
+          L(
+            "অ্যাকাউন্ট সক্রিয় হয়েছে, তবে অডিট লগ সংরক্ষণ হয়নি",
+            "Account is active, but audit logging failed",
+          ),
+        );
       }
       await refreshApplicants();
       await refresh();
     } catch (cause) {
-      console.error("Could not provision staff registration request", cause);
-      toast.error(L("অ্যাকাউন্ট তৈরি করা যায়নি", "Could not create the account"));
+      console.error("Could not approve staff registration request", cause);
+      toast.error(
+        L("অ্যাকাউন্ট তৈরি ও সক্রিয় করা যায়নি", "Could not create and activate the account"),
+      );
       void refreshApplicants();
     } finally {
       setBusyId(null);
@@ -215,15 +191,18 @@ export function ApprovalManagement() {
         toast.error(
           result.error === "mfa_required"
             ? L("অনুরোধ প্রত্যাখ্যান করতে MFA যাচাই করুন", "Verify MFA to reject this request")
-            : result.error === "request_unavailable"
-              ? L("অনুরোধটি ইতিমধ্যে প্রক্রিয়াধীন বা সম্পন্ন হয়েছে", "This request is already being processed or completed")
-              : L("অনুরোধ প্রত্যাখ্যান করা যায়নি", "Could not reject the request"),
+            : L("অনুরোধ প্রত্যাখ্যান করা যায়নি", "Could not reject the request"),
         );
         return;
       }
       toast.success(L("নিবন্ধনের অনুরোধ প্রত্যাখ্যান করা হয়েছে", "Registration request rejected"));
       if (result.warning === "audit_failed") {
-        toast.error(L("অনুরোধ প্রত্যাখ্যাত হয়েছে, তবে অডিট লগ সংরক্ষণ হয়নি", "Request rejected, but audit logging failed"));
+        toast.error(
+          L(
+            "অনুরোধ প্রত্যাখ্যাত হয়েছে, তবে অডিট লগ সংরক্ষণ হয়নি",
+            "Request rejected, but audit logging failed",
+          ),
+        );
       }
       await refreshApplicants();
     } catch (cause) {
@@ -242,7 +221,10 @@ export function ApprovalManagement() {
       if (!result.ok) {
         toast.error(
           result.error === "not_pending_or_forbidden"
-            ? L("এই আবেদনটি আর অপেক্ষমাণ নেই বা আপনার এলাকার নয়", "This registration is no longer pending or outside your jurisdiction")
+            ? L(
+                "এই আবেদনটি আর অপেক্ষমাণ নেই বা আপনার এলাকার নয়",
+                "This registration is no longer pending or outside your jurisdiction",
+              )
             : result.error === "mfa_required"
               ? L("অনুমোদন পরিবর্তনের জন্য MFA যাচাই করুন", "Verify MFA to change approval status")
               : L("নিবন্ধনের অবস্থা হালনাগাদ করা যায়নি", "Could not update registration status"),
@@ -255,28 +237,31 @@ export function ApprovalManagement() {
             : L("নিবন্ধন প্রত্যাখ্যান করা হয়েছে", "Registration rejected"),
         );
         if (result.warning === "audit_failed") {
-          toast.error(L("অবস্থা পরিবর্তিত হয়েছে, তবে নিরীক্ষা লগ সংরক্ষণ হয়নি", "Status changed, but audit logging failed"));
+          toast.error(
+            L(
+              "অবস্থা পরিবর্তিত হয়েছে, তবে নিরীক্ষা লগ সংরক্ষণ হয়নি",
+              "Status changed, but audit logging failed",
+            ),
+          );
         }
       }
     } catch (cause) {
       console.error("Could not update staff approval status", cause);
-      toast.error(L("নিবন্ধনের অবস্থা হালনাগাদ করা যায়নি", "Could not update registration status"));
+      toast.error(
+        L("নিবন্ধনের অবস্থা হালনাগাদ করা যায়নি", "Could not update registration status"),
+      );
       void refreshApplicants();
     } finally {
       setBusyId(null);
     }
   };
 
-  const areaLabel = isAdmin
-    ? L("আপনার ইউনিয়নের স্বাস্থ্যকর্মী ও গ্রাম পুলিশের নিবন্ধন অনুমোদন করুন", "Review Health Worker and Gram Police registrations in your union")
-    : L("আপনার উপজেলার কর্মীদের অ্যাকাউন্ট তৈরি ও ইউপি প্রশাসনিক কর্মকর্তার নিবন্ধন অনুমোদন করুন", "Create staff accounts and review UP Administrative Officer registrations in your upazila");
-
   return (
     <main className="mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8">
       <ModuleNavigation />
       <PageTitle
-        title={L("অনুমোদন ব্যবস্থাপনা", "Approval Management")}
-        sub={areaLabel}
+        title={L("অনুমোদন ব্যবস্থাপনা", "Staff approval")}
+        sub={L("সকল এলাকার অপেক্ষমাণ কর্মী নিবন্ধন", "Pending staff registrations from all areas")}
         actions={
           <Button variant="outline" onClick={() => void refreshApplicants()} disabled={loading}>
             <RefreshCw className="mr-2 h-4 w-4" />
@@ -285,84 +270,6 @@ export function ApprovalManagement() {
         }
       />
 
-      {user?.role === "uno" && <section className="mb-6 space-y-3 rounded-xl border border-emerald-200 bg-card p-4">
-        <h2 className="flex items-center gap-2 font-semibold">
-          <UserPlus className="h-4 w-4" />
-          {L("নতুন কর্মী অ্যাকাউন্ট তৈরি", "Create staff account")}
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="space-y-1">
-            <Label htmlFor="approval-name-bn">{L("নাম (বাংলা)", "Name (Bangla)")}</Label>
-            <Input id="approval-name-bn" value={nameBn} onChange={(event) => setNameBn(event.target.value)} maxLength={100} />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="approval-name-en">{L("নাম (ইংরেজি)", "Name (English)")}</Label>
-            <Input id="approval-name-en" value={nameEn} onChange={(event) => setNameEn(event.target.value)} maxLength={100} />
-          </div>
-          <div className="space-y-1">
-            <Label>{L("ভূমিকা", "Role")}</Label>
-            <Select value={role} onValueChange={(value) => {
-              if (assignableRoles.includes(value as StaffRole)) setRole(value as StaffRole);
-            }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {assignableRoles.map((item) => (
-                  <SelectItem key={item} value={item}>{roleName(item, L)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="approval-contact">{role === "admin" ? L("ইমেইল", "Email") : L("মোবাইল নম্বর", "Mobile number")}</Label>
-            <Input
-              id="approval-contact"
-              type={role === "admin" ? "email" : "tel"}
-              autoComplete={role === "admin" ? "email" : "tel"}
-              value={contact}
-              onChange={(event) => setContact(event.target.value)}
-              maxLength={255}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>{L("ইউনিয়ন", "Union")}</Label>
-            <Select value={unionId} onValueChange={setUnionId}>
-              <SelectTrigger><SelectValue placeholder={L("ইউনিয়ন বেছে নিন", "Select a union")} /></SelectTrigger>
-              <SelectContent>
-                {upazila?.unions.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>{L(item.bn, item.en)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {(role === "worker" || role === "police") && (
-            <div className="space-y-1">
-              <Label htmlFor="approval-ward">{L("ওয়ার্ড", "Ward")}</Label>
-              <Input
-                id="approval-ward"
-                type="number"
-                min={1}
-                max={9}
-                value={ward}
-                onChange={(event) => setWard(Number(event.target.value))}
-              />
-            </div>
-          )}
-        </div>
-        <Button
-          type="button"
-          disabled={
-            creating ||
-            !nameBn.trim() ||
-            !contact.trim() ||
-            !targetUnion ||
-            ((role === "worker" || role === "police") && (!Number.isInteger(ward) || ward < 1 || ward > 9))
-          }
-          onClick={() => void createRegistration()}
-        >
-          {creating ? L("তৈরি হচ্ছে…", "Creating…") : L("অনুমোদনের জন্য অ্যাকাউন্ট তৈরি", "Create account for approval")}
-        </Button>
-      </section>}
-
       {loading ? (
         <p className="py-12 text-center text-muted-foreground" role="status">
           {L("নিবন্ধনের তালিকা লোড হচ্ছে…", "Loading registrations…")}
@@ -370,53 +277,78 @@ export function ApprovalManagement() {
       ) : error ? (
         <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-5 text-center">
           <p className="mb-3 text-sm text-muted-foreground">
-            {L("নিবন্ধনের তালিকা পাওয়া যায়নি। আবার চেষ্টা করুন।", "The registration list is unavailable. Please try again.")}
+            {L(
+              "নিবন্ধনের তালিকা পাওয়া যায়নি। আবার চেষ্টা করুন।",
+              "The registration list is unavailable. Please try again.",
+            )}
           </p>
-          <Button variant="outline" onClick={() => void refreshApplicants()}>{L("আবার চেষ্টা করুন", "Try again")}</Button>
+          <Button variant="outline" onClick={() => void refreshApplicants()}>
+            {L("আবার চেষ্টা করুন", "Try again")}
+          </Button>
         </div>
       ) : applicants.length === 0 && requests.length === 0 ? (
         <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground">
-          {isAdmin
-            ? L("আপনার ইউনিয়নে অপেক্ষমাণ স্বাস্থ্যকর্মী বা গ্রাম পুলিশ নেই", "No Health Worker or Gram Police accounts are awaiting approval in your union")
-            : L("আপনার উপজেলায় অপেক্ষমাণ নিবন্ধনের অনুরোধ নেই", "There are no pending registration requests in your upazila")}
+          {L(
+            isSuperAdmin
+              ? "অপেক্ষমাণ নিবন্ধনের অনুরোধ নেই"
+              : "আপনার ইউনিয়নে অপেক্ষমাণ কর্মী নিবন্ধন নেই",
+            isSuperAdmin
+              ? "There are no pending registration requests"
+              : "There are no pending staff registrations in your union",
+          )}
         </div>
       ) : (
-        <div className="space-y-6">
-          {user?.role === "uno" && requests.length > 0 && (
-            <section className="space-y-3">
-              <h2 className="font-semibold">{L("নতুন নিবন্ধনের অনুরোধ", "New registration requests")}</h2>
-              {requests.map((request) => {
-                const union = upazila?.unions.find((item) => item.id === request.unionId);
-                return (
-                  <article key={request.id} className="flex flex-col gap-4 rounded-xl border border-emerald-200 bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <h3 className="font-semibold">{request.fullName}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {roleName(request.role, L)} · {union ? L(union.bn, union.en) : request.unionId}
-                      </p>
-                      <p className="break-all text-sm">{request.mobile}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {L("আবেদনের তারিখ", "Submitted")} · {new Date(request.createdAt).toLocaleDateString(L("bn-BD", "en-US"))}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 gap-2">
-                      <Button disabled={busyId !== null || creating} onClick={() => void provisionRequest(request)}>
-                        <UserPlus className="mr-1 h-4 w-4" />{L("অ্যাকাউন্ট তৈরি", "Create account")}
-                      </Button>
-                      <Button variant="destructive" disabled={busyId !== null || creating} onClick={() => void dismissRequest(request)}>
-                        <X className="mr-1 h-4 w-4" />{L("প্রত্যাখ্যান", "Reject")}
-                      </Button>
-                    </div>
-                  </article>
-                );
-              })}
-            </section>
-          )}
-          {applicants.length > 0 && (
-            <section className="space-y-3">
-              <h2 className="font-semibold">{L("অনুমোদনের অপেক্ষায় থাকা অ্যাকাউন্ট", "Accounts awaiting approval")}</h2>
-              {applicants.map((applicant) => (
-            <article key={applicant.id} className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-3">
+          {requests.map((request) => (
+            <article
+              key={request.id}
+              className="flex flex-col gap-4 rounded-xl border border-emerald-200 bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="min-w-0">
+                <h2 className="font-semibold">{request.fullName}</h2>
+                <p className="text-sm text-muted-foreground">
+                  {request.category}
+                  {request.requestedPosition && (
+                    <>
+                      {" · "}
+                      {EXECUTIVE_POSITIONS.find(
+                        (position) => position.role === request.requestedPosition,
+                      )?.bn ?? request.requestedPosition}
+                    </>
+                  )}
+                  {" · "}
+                  {roleName(request.role, L)} · {request.unionName}
+                </p>
+                {request.officeName && (
+                  <p className="text-sm text-muted-foreground">{request.officeName}</p>
+                )}
+                <p className="break-all text-sm">{request.email ?? request.mobile}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {L("আবেদনের তারিখ", "Submitted")} ·{" "}
+                  {new Date(request.createdAt).toLocaleDateString(L("bn-BD", "en-US"))}
+                </p>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <Button disabled={busyId !== null} onClick={() => void approveRequest(request)}>
+                  <Check className="mr-1 h-4 w-4" />
+                  {L("অনুমোদন ও সক্রিয় করুন", "Approve & activate")}
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={busyId !== null}
+                  onClick={() => void dismissRequest(request)}
+                >
+                  <X className="mr-1 h-4 w-4" />
+                  {L("প্রত্যাখ্যান", "Reject")}
+                </Button>
+              </div>
+            </article>
+          ))}
+          {applicants.map((applicant) => (
+            <article
+              key={applicant.id}
+              className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
+            >
               <div className="min-w-0">
                 <h2 className="font-semibold">{applicant.nameEn || applicant.nameBn}</h2>
                 {applicant.nameBn && applicant.nameBn !== applicant.nameEn && (
@@ -425,21 +357,29 @@ export function ApprovalManagement() {
                 <p className="text-sm text-muted-foreground">{roleName(applicant.role, L)}</p>
                 <p className="break-all text-sm">{applicant.email ?? applicant.mobile}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {L("আবেদনের তারিখ", "Submitted")} · {new Date(applicant.createdAt).toLocaleDateString(L("bn-BD", "en-US"))}
+                  {L("আবেদনের তারিখ", "Submitted")} ·{" "}
+                  {new Date(applicant.createdAt).toLocaleDateString(L("bn-BD", "en-US"))}
                 </p>
               </div>
               <div className="flex shrink-0 gap-2">
-                <Button disabled={busyId !== null} onClick={() => void decide(applicant, "approve")}>
-                  <Check className="mr-1 h-4 w-4" />{L("অনুমোদন", "Approve")}
+                <Button
+                  disabled={busyId !== null}
+                  onClick={() => void decide(applicant, "approve")}
+                >
+                  <Check className="mr-1 h-4 w-4" />
+                  {L("অনুমোদন", "Approve")}
                 </Button>
-                <Button variant="destructive" disabled={busyId !== null} onClick={() => void decide(applicant, "reject")}>
-                  <X className="mr-1 h-4 w-4" />{L("প্রত্যাখ্যান", "Reject")}
+                <Button
+                  variant="destructive"
+                  disabled={busyId !== null}
+                  onClick={() => void decide(applicant, "reject")}
+                >
+                  <X className="mr-1 h-4 w-4" />
+                  {L("প্রত্যাখ্যান", "Reject")}
                 </Button>
               </div>
             </article>
           ))}
-            </section>
-          )}
         </div>
       )}
     </main>

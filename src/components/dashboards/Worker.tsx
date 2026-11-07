@@ -1484,7 +1484,7 @@ export function RegForm({
               <Input className="h-12 text-base placeholder:text-base" autoComplete="tel" inputMode="tel" maxLength={11} placeholder="01XXXXXXXXX" required value={mobile} onChange={(event) => setMobile(normalizeNumericInput(event.target.value, 11))} />
             </FormRow>
           )}
-          {attachmentFields}
+          {type === "birth" && attachmentFields}
         </section>
 
         <section
@@ -1599,6 +1599,7 @@ export function RegForm({
             {activeAddressTab === "present" && presentAddressField}
             {activeAddressTab === "permanent" && permanentAddressField}
           </div>
+          {type === "death" && attachmentFields}
           <div className={`grid min-w-0 grid-cols-1 sm:grid-cols-2 ${type === "birth" ? "gap-2" : "gap-3"}`}>
             <label className="min-w-0 space-y-1">
               <span className="block text-lg font-bold text-slate-800">

@@ -20,7 +20,11 @@ function DeathRegistrationRoute() {
   const { applicationId } = Route.useSearch();
   return (
     <DashboardGate workerLayout={false}>
-      <EntryFormPage type="death" applicationId={applicationId} />
+      <EntryFormPage
+        type="death"
+        applicationId={applicationId}
+        routePath="/death-registration"
+      />
     </DashboardGate>
   );
 }

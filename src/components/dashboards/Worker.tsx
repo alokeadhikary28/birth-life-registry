@@ -91,6 +91,7 @@ type DialogState =
   | { kind: "epi" }
   | null;
 type EpiVisit = Tables<"epi_visits">;
+const reloadClearedDraftKeys = new Set<string>();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -106,6 +107,18 @@ function isBi(value: unknown): value is Bi {
 
 function readRegistrationDraft(key: string): Partial<RegistrationDraft> | undefined {
   if (typeof window === "undefined") return undefined;
+  const navigationEntry = window.performance.getEntriesByType(
+    "navigation",
+  )[0] as PerformanceNavigationTiming | undefined;
+  if (navigationEntry?.type === "reload" && !reloadClearedDraftKeys.has(key)) {
+    reloadClearedDraftKeys.add(key);
+    try {
+      window.localStorage.removeItem(key);
+    } catch (cause) {
+      console.error("Could not clear registration draft after page reload", cause);
+    }
+    return undefined;
+  }
   try {
     const stored = window.localStorage.getItem(key);
     if (!stored) return undefined;
@@ -139,9 +152,11 @@ function normalizeDuplicateName(value: string) {
 }
 
 function normalizeBengaliDigits(value: string) {
-  return value.replace(/[০-৯]/g, (digit) =>
-    String("০১২৩৪৫৬৭৮৯".indexOf(digit)),
-  );
+  return normalizeBdDigits(value);
+}
+
+function normalizeNumericInput(value: string, maxLength: number) {
+  return normalizeBdDigits(value).replace(/\D/g, "").slice(0, maxLength);
 }
 
 function childOrderLabel(order: number) {
@@ -187,9 +202,7 @@ function isValidIsoDate(value: string) {
 }
 
 function parseDateInput(value: string): string | undefined {
-  const normalized = value.replace(/[০-৯]/g, (digit) =>
-    String("০১২৩৪৫৬৭৮৯".indexOf(digit)),
-  ).trim();
+  const normalized = normalizeBdDigits(value).trim();
   const parts = normalized.split(/[./-]/);
   if (parts.length !== 3) return undefined;
 
@@ -219,7 +232,7 @@ function formatDateInput(value: string): string {
     return `${parsed.slice(8, 10)}/${parsed.slice(5, 7)}/${parsed.slice(0, 4)}`;
   }
 
-  const digits = normalized.replace(/\D/g, "").slice(0, 8);
+  const digits = normalizeNumericInput(normalized, 8);
   if (digits.length > 4) {
     return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
   }
@@ -271,9 +284,18 @@ function DatePickerField({
             <CalendarDays className="h-5 w-5" aria-hidden="true" />
           </button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-auto p-0">
+        <PopoverContent
+          side="bottom"
+          align="start"
+          sideOffset={4}
+          avoidCollisions={false}
+          className="w-auto max-w-[calc(100vw-1rem)] p-0"
+        >
           <Calendar
             mode="single"
+            captionLayout="dropdown"
+            startMonth={new Date(1900, 0)}
+            endMonth={new Date()}
             selected={selectedDate}
             onSelect={(date) => {
               if (!date) return;
@@ -299,6 +321,7 @@ function FormRow({
   inlineProminent = false,
   inlineLarger = false,
   stacked = false,
+  dense = false,
   labelAccessory,
   children,
 }: {
@@ -310,6 +333,7 @@ function FormRow({
   inlineProminent?: boolean;
   inlineLarger?: boolean;
   stacked?: boolean;
+  dense?: boolean;
   labelAccessory?: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -317,13 +341,13 @@ function FormRow({
     <div
       className={
         stacked
-          ? "grid min-w-0 gap-1 md:grid-cols-[10rem_minmax(0,1fr)] md:items-center md:gap-3"
+          ? `grid min-w-0 ${dense ? "gap-0.5 md:grid-cols-[9rem_minmax(0,1fr)] md:gap-2" : "gap-1 md:grid-cols-[10rem_minmax(0,1fr)] md:gap-3"} md:items-center`
           : inlineProminent
             ? "grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] items-center gap-1"
             : inline
               ? "flex min-w-0 flex-row items-center gap-1"
               : compact
-                ? "grid min-w-0 gap-1 md:grid-cols-[10rem_minmax(0,1fr)] md:items-center md:gap-3"
+                ? `grid min-w-0 ${dense ? "gap-0.5 md:grid-cols-[9rem_minmax(0,1fr)] md:gap-2" : "gap-1 md:grid-cols-[10rem_minmax(0,1fr)] md:gap-3"} md:items-center`
                 : "grid min-w-0 gap-2 md:grid-cols-[10rem_minmax(0,1fr)] md:items-center md:gap-3"
       }
     >
@@ -337,7 +361,7 @@ function FormRow({
           <p className={`${inline ? inlineProminent ? "text-lg font-medium" : inlineLarger ? "text-xl font-semibold" : "text-lg font-bold" : "text-lg font-bold"} text-slate-800`}>
             {labelBn}{required && <span className="text-red-600"> *</span>}
           </p>
-          <p className="text-lg text-slate-500">{labelEn}</p>
+          <p className={`${dense ? "text-base" : "text-lg"} text-slate-500`}>{labelEn}</p>
         </div>
       </div>
       <div className={inlineProminent ? "min-w-0" : inline ? "min-w-0 flex-1" : "min-w-0"}>{children}</div>
@@ -361,6 +385,7 @@ function VillageAddressField({
   sameAsLabel,
   sameAsChecked,
   onSameAsChange,
+  dense = false,
   L,
   n,
 }: {
@@ -379,6 +404,7 @@ function VillageAddressField({
   sameAsLabel?: string | undefined;
   sameAsChecked?: boolean | undefined;
   onSameAsChange?: ((checked: boolean) => void) | undefined;
+  dense?: boolean;
   L: (bn: string, en: string) => string;
   n: (value: number | string) => string;
 }) {
@@ -398,15 +424,15 @@ function VillageAddressField({
   ];
 
   return (
-    <fieldset className="min-w-0 space-y-1.5 rounded-lg border border-emerald-200 bg-emerald-50/40 p-1.5">
-      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+    <fieldset className={`min-w-0 rounded-lg border border-emerald-200 bg-emerald-50/40 ${dense ? "space-y-1 p-1" : "space-y-1.5 p-1.5"}`}>
+      <div className={`flex min-w-0 flex-col sm:flex-row sm:items-center ${dense ? "gap-1" : "gap-2"}`}>
         <div className="min-w-0 flex-1">
-          <p className="text-lg font-bold text-slate-800">
+          <p className={`${dense ? "text-base" : "text-lg"} font-bold text-slate-800`}>
             {title}
             {required && <span className="text-red-600"> *</span>}
           </p>
           {sameAsLabel && onSameAsChange && (
-            <label className="mt-1 flex items-center gap-2 text-sm font-medium text-emerald-900">
+            <label className={`${dense ? "mt-0.5" : "mt-1"} flex items-center gap-2 text-sm font-medium text-emerald-900`}>
               <input
                 type="checkbox"
                 className="h-4 w-4 accent-emerald-700"
@@ -417,26 +443,26 @@ function VillageAddressField({
             </label>
           )}
         </div>
-        <div className="flex min-w-0 items-center gap-2 sm:shrink-0">
+        <div className={`flex min-w-0 items-center sm:shrink-0 ${dense ? "gap-1" : "gap-2"}`}>
           <Label htmlFor={`${idPrefix}-holding`} className="shrink-0 text-base font-medium">
             {L("বাসা/হোল্ডিং নম্বর", "House/holding number")}
           </Label>
           <Input
             id={`${idPrefix}-holding`}
-            className="h-10 w-24 text-base sm:w-28"
+            className={`${dense ? "h-9" : "h-10"} w-24 text-base sm:w-28`}
             maxLength={160}
             disabled={disabled}
             value={holding}
-            onChange={(event) => onHoldingChange(event.target.value)}
+            onChange={(event) => onHoldingChange(normalizeBdDigits(event.target.value))}
           />
         </div>
       </div>
-      <div className="grid min-w-0 grid-cols-1 gap-1 md:grid-cols-[10rem_minmax(0,1fr)] md:items-center md:gap-3">
+      <div className={`grid min-w-0 grid-cols-1 md:items-center ${dense ? "gap-0.5 md:grid-cols-[9rem_minmax(0,1fr)] md:gap-2" : "gap-1 md:grid-cols-[10rem_minmax(0,1fr)] md:gap-3"}`}>
         <Label htmlFor={`${idPrefix}-village`} className="text-base font-semibold">
           {L("গ্রাম/মহল্লা নির্বাচন", "Select village/neighborhood")}
         </Label>
         <Select value={villageId} onValueChange={onVillageChange} required={required}>
-          <SelectTrigger id={`${idPrefix}-village`} disabled={disabled} className="h-11 w-full min-w-0 text-base">
+          <SelectTrigger id={`${idPrefix}-village`} disabled={disabled} className={`${dense ? "h-10" : "h-11"} w-full min-w-0 text-base`}>
             <SelectValue placeholder={L("গ্রাম/মহল্লা নির্বাচন করুন", "Choose village/neighborhood")} />
           </SelectTrigger>
           <SelectContent>
@@ -446,9 +472,9 @@ function VillageAddressField({
           </SelectContent>
         </Select>
       </div>
-      <div className="grid grid-cols-1 gap-1.5 md:grid-cols-2 xl:grid-cols-4">
+      <div className={`grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 ${dense ? "gap-1" : "gap-1.5"}`}>
         {details.map(([label, value]) => (
-          <div key={label} className="min-w-0 rounded-md bg-white px-2 py-1">
+          <div key={label} className={`min-w-0 rounded-md bg-white ${dense ? "px-1.5 py-0.5" : "px-2 py-1"}`}>
             <p className="text-sm font-medium text-slate-500">{label}</p>
             <p className="break-words text-base font-semibold text-slate-800">{value || "—"}</p>
           </div>
@@ -465,6 +491,7 @@ function BiField({
   onChange,
   required = false,
   compact = false,
+  dense = false,
 }: {
   label: string;
   labelEn?: string;
@@ -472,11 +499,12 @@ function BiField({
   onChange: (next: Bi) => void;
   required?: boolean;
   compact?: boolean;
+  dense?: boolean;
 }) {
   const fields = (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+    <div className={`grid grid-cols-1 sm:grid-cols-2 ${dense ? "gap-1" : "gap-2"}`}>
       <Input
-        className="h-14 px-3 text-lg placeholder:text-lg"
+        className={`${dense ? "h-12 px-2.5 text-base placeholder:text-base" : "h-14 px-3 text-lg placeholder:text-lg"}`}
         aria-label={`${label} — বাংলা`}
         autoComplete="off"
         maxLength={100}
@@ -486,7 +514,7 @@ function BiField({
         onChange={(event) => onChange({ ...value, bn: event.target.value })}
       />
       <Input
-        className="h-14 px-3 text-lg placeholder:text-lg"
+        className={`${dense ? "h-12 px-2.5 text-base placeholder:text-base" : "h-14 px-3 text-lg placeholder:text-lg"}`}
         aria-label={`${label} — English`}
         autoComplete="off"
         maxLength={100}
@@ -498,7 +526,7 @@ function BiField({
     </div>
   );
   if (labelEn) {
-    return <FormRow labelBn={label} labelEn={labelEn} required={required} compact={compact}>{fields}</FormRow>;
+    return <FormRow labelBn={label} labelEn={labelEn} required={required} compact={compact} dense={dense}>{fields}</FormRow>;
   }
   return (
     <fieldset className="min-w-0 space-y-1">
@@ -544,30 +572,38 @@ export function RegForm({
   );
   const [cause, setCause] = useState<Bi>(savedDraft?.cause ?? entry?.cause ?? emptyBi);
   const [nid, setNid] = useState(
-    normalizeBengaliDigits(savedDraft?.nid ?? entry?.nid ?? ""),
+    normalizeNumericInput(savedDraft?.nid ?? entry?.nid ?? "", 17),
   );
-  const [mobile, setMobile] = useState(savedDraft?.mobile ?? entry?.parentMobile ?? "");
+  const [mobile, setMobile] = useState(
+    normalizeNumericInput(savedDraft?.mobile ?? entry?.parentMobile ?? "", 11),
+  );
   const [gender, setGender] = useState<RegCase["gender"]>(savedDraft?.gender ?? entry?.gender ?? "male");
   const [dob, setDob] = useState(formatDateInput(savedDraft?.dob ?? entry?.dob ?? ""));
   const [dod, setDod] = useState(formatDateInput(savedDraft?.dod ?? entry?.dod ?? ""));
-  const [order, setOrder] = useState(savedDraft?.order ?? entry?.order ?? "1");
-  const [fatherBrn, setFatherBrn] = useState(savedDraft?.fatherBrn ?? entry?.details?.fatherBrn ?? "");
+  const [order, setOrder] = useState(
+    normalizeNumericInput(savedDraft?.order ?? entry?.order ?? "1", 2),
+  );
+  const [fatherBrn, setFatherBrn] = useState(
+    normalizeNumericInput(savedDraft?.fatherBrn ?? entry?.details?.fatherBrn ?? "", 17),
+  );
   const [fatherDob, setFatherDob] = useState(
     formatDateInput(savedDraft?.fatherDob ?? entry?.details?.fatherDob ?? ""),
   );
-  const [motherBrn, setMotherBrn] = useState(savedDraft?.motherBrn ?? entry?.details?.motherBrn ?? "");
+  const [motherBrn, setMotherBrn] = useState(
+    normalizeNumericInput(savedDraft?.motherBrn ?? entry?.details?.motherBrn ?? "", 17),
+  );
   const [motherDob, setMotherDob] = useState(
     formatDateInput(savedDraft?.motherDob ?? entry?.details?.motherDob ?? ""),
   );
   const [villageId, setVillageId] = useState(savedDraft?.villageId ?? entry?.villageId ?? "");
   const [addressHolding, setAddressHolding] = useState(
-    savedDraft?.addressHolding ?? entry?.details?.addressHolding ?? "",
+    normalizeBdDigits(savedDraft?.addressHolding ?? entry?.details?.addressHolding ?? ""),
   );
   const [presentVillageId, setPresentVillageId] = useState(
     savedDraft?.presentVillageId ?? entry?.details?.presentVillageId ?? entry?.villageId ?? "",
   );
   const [presentAddressHolding, setPresentAddressHolding] = useState(
-    savedDraft?.presentAddressHolding ?? entry?.details?.presentAddressHolding ?? entry?.details?.addressHolding ?? "",
+    normalizeBdDigits(savedDraft?.presentAddressHolding ?? entry?.details?.presentAddressHolding ?? entry?.details?.addressHolding ?? ""),
   );
   const [samePresentAsBirth, setSamePresentAsBirth] = useState(
     savedDraft?.samePresentAsBirth ?? !entry?.details?.presentVillageId,
@@ -576,7 +612,7 @@ export function RegForm({
     savedDraft?.permanentVillageId ?? entry?.details?.permanentVillageId ?? entry?.details?.presentVillageId ?? entry?.villageId ?? "",
   );
   const [permanentAddressHolding, setPermanentAddressHolding] = useState(
-    savedDraft?.permanentAddressHolding ?? entry?.details?.permanentAddressHolding ?? entry?.details?.presentAddressHolding ?? entry?.details?.addressHolding ?? "",
+    normalizeBdDigits(savedDraft?.permanentAddressHolding ?? entry?.details?.permanentAddressHolding ?? entry?.details?.presentAddressHolding ?? entry?.details?.addressHolding ?? ""),
   );
   const [samePermanentAsPresent, setSamePermanentAsPresent] = useState(
     savedDraft?.samePermanentAsPresent ?? !entry?.details?.permanentVillageId,
@@ -587,12 +623,16 @@ export function RegForm({
   const resolvedVillageAddress = resolveVillageAddress(upazila, union?.id, villageId);
   const selectedUnion = resolvedVillageAddress?.union ?? union;
   const selectedVillage = resolvedVillageAddress?.village ?? undefined;
-  const [attachments, setAttachments] = useState<(File | null)[]>([null, null, null]);
+  const [attachments, setAttachments] = useState<(File | null)[]>([
+    null,
+    null,
+    null,
+    null,
+  ]);
   const [filesChanged, setFilesChanged] = useState(false);
   const [compressing, setCompressing] = useState<number | null>(null);
   const [imagePreview, setImagePreview] = useState<{ src: string; title: string; objectUrl: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
-  const [successOpen, setSuccessOpen] = useState(false);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [error, setError] = useState("");
   const draftSaveErrorShown = useRef(false);
@@ -626,23 +666,23 @@ export function RegForm({
         "",
     );
     setCause(draft?.cause ?? entry?.cause ?? emptyBi);
-    setNid(normalizeBengaliDigits(draft?.nid ?? entry?.nid ?? ""));
-    setMobile(draft?.mobile ?? entry?.parentMobile ?? "");
+    setNid(normalizeNumericInput(draft?.nid ?? entry?.nid ?? "", 17));
+    setMobile(normalizeNumericInput(draft?.mobile ?? entry?.parentMobile ?? "", 11));
     setGender(draft?.gender ?? entry?.gender ?? "male");
     setDob(formatDateInput(draft?.dob ?? entry?.dob ?? ""));
     setDod(formatDateInput(draft?.dod ?? entry?.dod ?? ""));
-    setOrder(draft?.order ?? entry?.order ?? "1");
-    setFatherBrn(draft?.fatherBrn ?? entry?.details?.fatherBrn ?? "");
+    setOrder(normalizeNumericInput(draft?.order ?? entry?.order ?? "1", 2));
+    setFatherBrn(normalizeNumericInput(draft?.fatherBrn ?? entry?.details?.fatherBrn ?? "", 17));
     setFatherDob(formatDateInput(draft?.fatherDob ?? entry?.details?.fatherDob ?? ""));
-    setMotherBrn(draft?.motherBrn ?? entry?.details?.motherBrn ?? "");
+    setMotherBrn(normalizeNumericInput(draft?.motherBrn ?? entry?.details?.motherBrn ?? "", 17));
     setMotherDob(formatDateInput(draft?.motherDob ?? entry?.details?.motherDob ?? ""));
     setVillageId(draft?.villageId ?? entry?.villageId ?? "");
-    setAddressHolding(draft?.addressHolding ?? entry?.details?.addressHolding ?? "");
+    setAddressHolding(normalizeBdDigits(draft?.addressHolding ?? entry?.details?.addressHolding ?? ""));
     setPresentVillageId(draft?.presentVillageId ?? entry?.details?.presentVillageId ?? entry?.villageId ?? "");
-    setPresentAddressHolding(draft?.presentAddressHolding ?? entry?.details?.presentAddressHolding ?? entry?.details?.addressHolding ?? "");
+    setPresentAddressHolding(normalizeBdDigits(draft?.presentAddressHolding ?? entry?.details?.presentAddressHolding ?? entry?.details?.addressHolding ?? ""));
     setSamePresentAsBirth(draft?.samePresentAsBirth ?? !entry?.details?.presentVillageId);
     setPermanentVillageId(draft?.permanentVillageId ?? entry?.details?.permanentVillageId ?? entry?.details?.presentVillageId ?? entry?.villageId ?? "");
-    setPermanentAddressHolding(draft?.permanentAddressHolding ?? entry?.details?.permanentAddressHolding ?? entry?.details?.presentAddressHolding ?? entry?.details?.addressHolding ?? "");
+    setPermanentAddressHolding(normalizeBdDigits(draft?.permanentAddressHolding ?? entry?.details?.permanentAddressHolding ?? entry?.details?.presentAddressHolding ?? entry?.details?.addressHolding ?? ""));
     setSamePermanentAsPresent(draft?.samePermanentAsPresent ?? !entry?.details?.permanentVillageId);
     setError("");
     setActiveDraftKey(draftKey);
@@ -857,88 +897,97 @@ export function RegForm({
   };
 
   const attachmentFields = (
-    <fieldset className="space-y-1">
-      <p className="text-lg font-semibold text-emerald-800" role="note">
+    <fieldset className="min-w-0 space-y-1">
+      <p className="text-base font-semibold text-emerald-800" role="note">
         {L(
-          "ছবি সংযুক্তি · ৩টি ছবি · প্রতিটি সর্বোচ্চ ৭৫০ KB",
-          "Photo attachments · 3 photos · maximum 750 KB each",
+          "ছবি সংযুক্তি · ৪টি ছবি · প্রতিটি সর্বোচ্চ ৭৫০ KB",
+          "Photo attachments · 4 photos · maximum 750 KB each",
         )}
       </p>
-      <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
         {attachments.map((file, index) => {
           const savedFile = !filesChanged ? oldFiles[index] : undefined;
           const canPreview = Boolean(file || savedFile?.path || savedFile?.url || savedFile?.dataUrl);
           return (
             <div
               key={index}
-              className="flex min-h-14 min-w-0 items-center gap-2 rounded-lg border border-dashed border-emerald-300 bg-white px-2 py-2 hover:bg-emerald-50"
+              className="grid min-w-0 grid-cols-3 items-center gap-1 rounded-md border border-dashed border-emerald-300 bg-white p-1 hover:bg-emerald-50"
             >
-              <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-lg">
-                <FileImage className={`${type === "birth" ? "h-4 w-4" : "h-3.5 w-3.5"} shrink-0 text-emerald-700`} />
-                <span className="min-w-0 flex-1 truncate">
-                  {compressing === index
-                    ? L("সংকুচিত হচ্ছে…", "Compressing…")
-                    : file
+              <div className="relative flex min-w-0 items-center">
+                <label
+                  htmlFor={`case-photo-${index}`}
+                  title={
+                    file
                       ? `${file.name} · ${Math.ceil(file.size / 1024)} KB`
-                      : (savedFile?.name ?? L(`ছবি ${index + 1} বাছুন`, `Choose image ${index + 1}`))}
-                </span>
-                <input
-                  accept="image/*"
-                  className="sr-only"
-                  disabled={compressing !== null}
-                  type="file"
-                  onChange={(event) => void chooseImage(index, event.target.files?.[0])}
-                />
-              </label>
-              <div className="flex shrink-0 items-center gap-1">
-                <button
-                  type="button"
-                  disabled={!canPreview}
-                  className="inline-flex min-h-10 items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  aria-label={L(`ছবি ${index + 1} দেখুন`, `Preview image ${index + 1}`)}
-                  onClick={() =>
-                    void showImagePreview(
-                      L(`ছবি ${index + 1}`, `Image ${index + 1}`),
-                      file,
-                      savedFile,
-                    )
+                      : savedFile?.name ?? L("ছবি আপলোড", "Upload photo")
                   }
+                  className="inline-flex min-h-10 w-full min-w-0 cursor-pointer items-center justify-center gap-1 rounded border border-emerald-300 bg-emerald-50 px-1 text-center text-sm font-semibold leading-tight text-emerald-900 hover:bg-emerald-100"
                 >
-                  <Eye className="h-4 w-4" aria-hidden="true" />
-                  <span>{L("দেখুন", "View")}</span>
-                </button>
-                <button
-                  type="button"
-                  disabled={!canPreview}
-                  className="inline-flex min-h-10 items-center gap-1 rounded-md border border-slate-300 bg-slate-50 px-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  aria-label={L(`ছবি ${index + 1} প্রিন্ট করুন`, `Print image ${index + 1}`)}
-                  onClick={() =>
-                    void printImage(
-                      L(`ছবি ${index + 1}`, `Image ${index + 1}`),
-                      file,
-                      savedFile,
-                    )
-                  }
-                >
-                  <Printer className="h-4 w-4" aria-hidden="true" />
-                  <span>{L("প্রিন্ট", "Print")}</span>
-                </button>
+                  <FileImage className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="min-w-0">
+                    {L(`ছবি ${index + 1} আপলোড`, `Photo ${index + 1} upload`)}
+                  </span>
+                  <input
+                    id={`case-photo-${index}`}
+                    accept="image/*"
+                    className="sr-only"
+                    aria-label={L(
+                      `ছবি ${index + 1} আপলোড বা পরিবর্তন করুন`,
+                      `Upload or replace photo ${index + 1}`,
+                    )}
+                    disabled={compressing !== null}
+                    type="file"
+                    onChange={(event) => void chooseImage(index, event.target.files?.[0])}
+                  />
+                </label>
+                {file && (
+                  <button
+                    type="button"
+                    className="absolute right-0.5 top-0.5 rounded bg-white/90 px-1 font-bold leading-none text-red-700 shadow-sm"
+                    aria-label={L(`ছবি ${index + 1} সরান`, `Remove photo ${index + 1}`)}
+                    onClick={() => {
+                      setAttachments((current) =>
+                        current.map((item, position) => (position === index ? null : item)),
+                      );
+                      setFilesChanged(true);
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
               </div>
-              {file && (
-                <button
-                  type="button"
-                  className="px-1 font-bold text-red-700"
-                  aria-label={L("ছবি সরান", "Remove image")}
-                  onClick={() => {
-                    setAttachments((current) =>
-                      current.map((item, position) => (position === index ? null : item)),
-                    );
-                    setFilesChanged(true);
-                  }}
-                >
-                  ×
-                </button>
-              )}
+              <button
+                type="button"
+                disabled={!canPreview}
+                className="inline-flex min-h-9 min-w-0 items-center justify-center gap-0.5 rounded border border-emerald-300 bg-emerald-50 px-1 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label={L(`ছবি ${index + 1} দেখুন`, `Preview image ${index + 1}`)}
+                onClick={() =>
+                  void showImagePreview(
+                    L(`ছবি ${index + 1}`, `Image ${index + 1}`),
+                    file,
+                    savedFile,
+                  )
+                }
+              >
+                <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>{L("দেখুন", "View")}</span>
+              </button>
+              <button
+                type="button"
+                disabled={!canPreview}
+                className="inline-flex min-h-9 min-w-0 items-center justify-center gap-0.5 rounded border border-slate-300 bg-slate-50 px-1 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label={L(`ছবি ${index + 1} প্রিন্ট করুন`, `Print image ${index + 1}`)}
+                onClick={() =>
+                  void printImage(
+                    L(`ছবি ${index + 1}`, `Image ${index + 1}`),
+                    file,
+                    savedFile,
+                  )
+                }
+              >
+                <Printer className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>{L("প্রিন্ট", "Print")}</span>
+              </button>
             </div>
           );
         })}
@@ -1187,7 +1236,7 @@ export function RegForm({
         console.error("Could not clear submitted registration draft", causeError);
       }
       submissionSucceeded.current = true;
-      setSuccessOpen(true);
+      onSaved();
     } finally {
       setSaving(false);
     }
@@ -1202,6 +1251,7 @@ export function RegForm({
       districtEn={upazila.districtEn}
       idPrefix="birth-place"
       required
+      dense={type === "birth"}
       villageId={villageId}
       onVillageChange={setVillageId}
       holding={addressHolding}
@@ -1222,6 +1272,7 @@ export function RegForm({
       districtEn={upazila.districtEn}
       idPrefix="present-address"
       required
+      dense={type === "birth"}
       disabled={samePresentAsBirth}
       villageId={presentVillageId}
       onVillageChange={setPresentVillageId}
@@ -1252,6 +1303,7 @@ export function RegForm({
       districtEn={upazila.districtEn}
       idPrefix="permanent-address"
       required
+      dense={type === "birth"}
       disabled={samePermanentAsPresent}
       villageId={permanentVillageId}
       onVillageChange={setPermanentVillageId}
@@ -1291,10 +1343,18 @@ export function RegForm({
 
   return (
     <form
-      className="grid w-full max-w-full grid-cols-1 gap-4 rounded-2xl border border-emerald-100 bg-white p-2 shadow-sm sm:p-4 md:grid-cols-2"
+      className={`grid w-full max-w-full grid-cols-1 rounded-2xl border border-emerald-100 bg-white shadow-sm md:grid-cols-2 ${
+        type === "birth" ? "gap-3 p-1.5 sm:p-3" : "gap-4 p-2 sm:p-4"
+      }`}
       onSubmit={save}
     >
-      <div className="sticky top-0 z-20 col-span-full rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 via-emerald-100 to-teal-50 px-3 py-2 text-emerald-950 shadow-sm sm:px-4">
+      <div
+        className={`sticky top-0 z-20 col-span-full rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 via-emerald-100 to-teal-50 px-3 text-emerald-950 shadow-sm sm:px-4 ${
+          type === "birth"
+            ? "-mx-2 -mt-[0.333rem] py-0 sm:-mx-4"
+            : "py-0"
+        }`}
+      >
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-bold text-emerald-950 sm:text-xl">
             {type === "birth" ? "জন্ম নিবন্ধনের আবেদন" : "মৃত্যু নিবন্ধনের আবেদন"}
@@ -1302,15 +1362,12 @@ export function RegForm({
           <Button
             type="button"
             variant="outline"
-            className="min-h-10 shrink-0 border-emerald-700 bg-emerald-600 px-3 text-base text-white transition-colors hover:bg-emerald-700 hover:text-white sm:text-lg"
+            className="min-h-7 shrink-0 border-emerald-700 bg-emerald-600 px-2 text-sm text-white transition-colors hover:bg-emerald-700 hover:text-white"
             onClick={onCancel}
           >
             <Home className="mr-1.5 h-4 w-4" />{L("হোম পেজে ফিরে যান", "Home")}
           </Button>
         </div>
-        <p className="text-base leading-5 text-emerald-800">
-          {type === "birth" ? "Birth Registration Application" : "Death Registration Application"}
-        </p>
         {!online && (
           <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-lg font-medium text-amber-950" role="status">
             {L(
@@ -1321,21 +1378,25 @@ export function RegForm({
         )}
       </div>
 
-      <div className="col-span-full grid min-w-0 grid-cols-1 items-start gap-6 md:grid-cols-2">
-        <section className="min-w-0 space-y-4" aria-label={L("ব্যক্তিগত তথ্য", "Personal details")}>
+      <div className={`col-span-full grid min-w-0 grid-cols-1 items-start md:grid-cols-2 ${type === "birth" ? "gap-4" : "gap-6"}`}>
+        <section
+          className={`min-w-0 ${type === "birth" ? "space-y-2" : "space-y-4"}`}
+          aria-label={L("ব্যক্তিগত তথ্য", "Personal details")}
+        >
           {type === "birth" ? (
             <>
-              <FormRow labelBn="জন্মতারিখ" labelEn="Date of Birth" required stacked>
+              <FormRow labelBn="জন্মতারিখ" labelEn="Date of Birth" required stacked dense>
                 <DatePickerField
                   ariaLabel="জন্মতারিখ / Date of birth"
                   required
+                  className="h-12 w-full text-base placeholder:text-base"
                   value={dob}
                   onChange={setDob}
                 />
               </FormRow>
-              <FormRow labelBn="কত তম সন্তান" labelEn="Child Order" required stacked>
+              <FormRow labelBn="কত তম সন্তান" labelEn="Child Order" required stacked dense>
                 <Select value={order} onValueChange={setOrder} required>
-                  <SelectTrigger className="h-14 w-full min-w-0 px-3 text-lg" aria-label="কত তম সন্তান / Child order">
+                  <SelectTrigger className="h-12 w-full min-w-0 px-3 text-lg" aria-label="কত তম সন্তান / Child order">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1347,23 +1408,23 @@ export function RegForm({
                   </SelectContent>
                 </Select>
               </FormRow>
-              <FormRow labelBn="লিঙ্গ" labelEn="Gender" required compact>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="লিঙ্গ / Gender">
+              <FormRow labelBn="লিঙ্গ" labelEn="Gender" required compact dense>
+                <div className="grid grid-cols-1 gap-1 sm:grid-cols-3" role="radiogroup" aria-label="লিঙ্গ / Gender">
                   {([
                     ["female", "নারী", "Female"],
                     ["male", "পুরুষ", "Male"],
                     ["other", "তৃতীয় লিঙ্গ", "Other"],
                   ] as const).map(([value, labelBn, labelEn]) => (
-                    <label key={value} className="flex min-h-14 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-2 py-1.5 hover:border-emerald-400">
+                    <label key={value} className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-2 py-1 hover:border-emerald-400">
                       <input className="h-4 w-4 shrink-0 accent-emerald-600" type="radio" name="gender-birth" value={value} checked={gender === value} onChange={() => setGender(value)} required />
                       <span><span className="block text-lg font-semibold text-slate-800">{labelBn}</span><span className="block text-lg text-slate-500">{labelEn}</span></span>
                     </label>
                   ))}
                 </div>
               </FormRow>
-              <BiField label="শিশুর নাম" labelEn="Child's Name" value={name} onChange={setName} required compact />
-              <BiField label="মাতার নাম" labelEn="Mother's Name" value={mother} onChange={setMother} required compact />
-              <BiField label="পিতার নাম" labelEn="Father's Name" value={father} onChange={setFather} required compact />
+              <BiField label="শিশুর নাম" labelEn="Child's Name" value={name} onChange={setName} required compact dense />
+              <BiField label="মাতার নাম" labelEn="Mother's Name" value={mother} onChange={setMother} required compact dense />
+              <BiField label="পিতার নাম" labelEn="Father's Name" value={father} onChange={setFather} required compact dense />
             </>
           ) : (
             <>
@@ -1416,6 +1477,68 @@ export function RegForm({
               <BiField label="মাতার নাম" labelEn="Mother's Name" value={mother} onChange={setMother} required compact />
               <BiField label="পিতার নাম" labelEn="Father's Name" value={father} onChange={setFather} required compact />
               <BiField label="স্বামী/স্ত্রীর নাম" labelEn="Spouse's Name" value={spouseName} onChange={setSpouseName} compact />
+            </>
+          )}
+          {type === "birth" && (
+            <FormRow labelBn="মোবাইল নম্বর" labelEn="Mobile Number" required compact dense>
+              <Input className="h-12 text-base placeholder:text-base" autoComplete="tel" inputMode="tel" maxLength={11} placeholder="01XXXXXXXXX" required value={mobile} onChange={(event) => setMobile(normalizeNumericInput(event.target.value, 11))} />
+            </FormRow>
+          )}
+          {attachmentFields}
+        </section>
+
+        <section
+          className={`min-w-0 ${type === "birth" ? "space-y-1.5" : "space-y-2"}`}
+          aria-label={L("ঠিকানা ও সংযুক্তি", "Address and attachments")}
+        >
+          {type === "birth" && (
+            <>
+              <div className="space-y-1.5">
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  <label className="min-w-0 space-y-1">
+                    <span className="block text-lg font-bold text-slate-800">
+                      {L("মাতার জন্ম নিবন্ধন নং", "Mother's BRN")}
+                    </span>
+                    <Input className="h-12 text-base placeholder:text-base" autoComplete="off" inputMode="numeric" maxLength={17} placeholder="১৭ অঙ্কের BRN" aria-label="মাতার জন্ম নিবন্ধন নম্বর / Mother's BRN" aria-invalid={motherBrn.length > 0 && !isValidBrn(motherBrn)} value={motherBrn} onChange={(event) => setMotherBrn(normalizeNumericInput(event.target.value, 17))} />
+                  </label>
+                  <label className="min-w-0 space-y-1">
+                    <span className="block text-lg font-bold text-slate-800">
+                      {L("মাতার জন্ম তারিখ", "Mother's date of birth")}
+                    </span>
+                    <DatePickerField
+                      ariaLabel="মাতার জন্ম তারিখ / Mother's date of birth"
+                      className="h-12 w-full text-base placeholder:text-base"
+                      value={motherDob}
+                      onChange={setMotherDob}
+                    />
+                  </label>
+                </div>
+                {motherBrn.length > 0 && !isValidBrn(motherBrn) && <p className="md:ml-[10.75rem] text-base font-medium text-red-700">{L("মাতার BRN ১৭ অঙ্কের হতে হবে", "Mother's BRN must be 17 digits")}</p>}
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  <label className="min-w-0 space-y-1">
+                    <span className="block text-lg font-bold text-slate-800">
+                      {L("পিতার জন্ম নিবন্ধন নং", "Father's BRN")}
+                    </span>
+                    <Input className="h-12 text-base placeholder:text-base" autoComplete="off" inputMode="numeric" maxLength={17} placeholder="১৭ অঙ্কের BRN" aria-label="পিতার জন্ম নিবন্ধন নম্বর / Father's BRN" aria-invalid={fatherBrn.length > 0 && !isValidBrn(fatherBrn)} value={fatherBrn} onChange={(event) => setFatherBrn(normalizeNumericInput(event.target.value, 17))} />
+                  </label>
+                  <label className="min-w-0 space-y-1">
+                    <span className="block text-lg font-bold text-slate-800">
+                      {L("পিতার জন্ম তারিখ", "Father's date of birth")}
+                    </span>
+                    <DatePickerField
+                      ariaLabel="পিতার জন্ম তারিখ / Father's date of birth"
+                      className="h-12 w-full text-base placeholder:text-base"
+                      value={fatherDob}
+                      onChange={setFatherDob}
+                    />
+                  </label>
+                </div>
+                {fatherBrn.length > 0 && !isValidBrn(fatherBrn) && <p className="md:ml-[10.75rem] text-base font-medium text-red-700">{L("পিতার BRN ১৭ অঙ্কের হতে হবে", "Father's BRN must be 17 digits")}</p>}
+              </div>
+            </>
+          )}
+          {type === "death" && (
+            <div className="grid min-w-0 grid-cols-1 gap-3">
               <FormRow labelBn="জাতীয় পরিচয়পত্র নং" labelEn="National ID No." compact>
                 <Input
                   className="h-14 text-lg placeholder:text-lg"
@@ -1424,59 +1547,14 @@ export function RegForm({
                   maxLength={17}
                   placeholder="ঐচ্ছিক / Optional"
                   value={nid}
-                  onChange={(event) => setNid(normalizeBdDigits(event.target.value).replace(/\D/g, "").slice(0, 17))}
+                  onChange={(event) => setNid(normalizeNumericInput(event.target.value, 17))}
                 />
               </FormRow>
-            </>
-          )}
-          <FormRow labelBn="মোবাইল নম্বর" labelEn="Mobile Number" required compact>
-            <Input className="h-14 text-lg placeholder:text-lg" autoComplete="tel" inputMode="tel" maxLength={11} placeholder="01XXXXXXXXX" required value={mobile} onChange={(event) => setMobile(event.target.value.replace(/\D/g, "").slice(0, 11))} />
-          </FormRow>
-          {type === "birth" && (
-          <div className="space-y-3">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="min-w-0 space-y-1">
-                <span className="block text-lg font-bold text-slate-800">
-                  {L("মাতার জন্ম নিবন্ধন নং", "Mother's BRN")}
-                </span>
-                <Input className="h-14 text-lg placeholder:text-lg" autoComplete="off" inputMode="numeric" maxLength={17} placeholder="১৭ অঙ্কের BRN" aria-label="মাতার জন্ম নিবন্ধন নম্বর / Mother's BRN" aria-invalid={motherBrn.length > 0 && !isValidBrn(motherBrn)} value={motherBrn} onChange={(event) => setMotherBrn(normalizeBdDigits(event.target.value).replace(/\D/g, "").slice(0, 17))} />
-              </label>
-              <label className="min-w-0 space-y-1">
-                <span className="block text-lg font-bold text-slate-800">
-                  {L("মাতার জন্ম তারিখ", "Mother's date of birth")}
-                </span>
-                <DatePickerField
-                  ariaLabel="মাতার জন্ম তারিখ / Mother's date of birth"
-                  value={motherDob}
-                  onChange={setMotherDob}
-                />
-              </label>
+              <FormRow labelBn="মোবাইল নম্বর" labelEn="Mobile Number" required compact>
+                <Input className="h-14 text-lg placeholder:text-lg" autoComplete="tel" inputMode="tel" maxLength={11} placeholder="01XXXXXXXXX" required value={mobile} onChange={(event) => setMobile(normalizeNumericInput(event.target.value, 11))} />
+              </FormRow>
             </div>
-            {motherBrn.length > 0 && !isValidBrn(motherBrn) && <p className="md:ml-[10.75rem] text-base font-medium text-red-700">{L("মাতার BRN ১৭ অঙ্কের হতে হবে", "Mother's BRN must be 17 digits")}</p>}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="min-w-0 space-y-1">
-                <span className="block text-lg font-bold text-slate-800">
-                  {L("পিতার জন্ম নিবন্ধন নং", "Father's BRN")}
-                </span>
-                <Input className="h-14 text-lg placeholder:text-lg" autoComplete="off" inputMode="numeric" maxLength={17} placeholder="১৭ অঙ্কের BRN" aria-label="পিতার জন্ম নিবন্ধন নম্বর / Father's BRN" aria-invalid={fatherBrn.length > 0 && !isValidBrn(fatherBrn)} value={fatherBrn} onChange={(event) => setFatherBrn(normalizeBdDigits(event.target.value).replace(/\D/g, "").slice(0, 17))} />
-              </label>
-              <label className="min-w-0 space-y-1">
-                <span className="block text-lg font-bold text-slate-800">
-                  {L("পিতার জন্ম তারিখ", "Father's date of birth")}
-                </span>
-                <DatePickerField
-                  ariaLabel="পিতার জন্ম তারিখ / Father's date of birth"
-                  value={fatherDob}
-                  onChange={setFatherDob}
-                />
-              </label>
-            </div>
-            {fatherBrn.length > 0 && !isValidBrn(fatherBrn) && <p className="md:ml-[10.75rem] text-base font-medium text-red-700">{L("পিতার BRN ১৭ অঙ্কের হতে হবে", "Father's BRN must be 17 digits")}</p>}
-          </div>
           )}
-        </section>
-
-        <section className="min-w-0 space-y-2" aria-label={L("ঠিকানা ও সংযুক্তি", "Address and attachments")}>
           <div
             role="tablist"
             aria-label={L("ঠিকানার ধরন", "Address type")}
@@ -1521,14 +1599,13 @@ export function RegForm({
             {activeAddressTab === "present" && presentAddressField}
             {activeAddressTab === "permanent" && permanentAddressField}
           </div>
-          {attachmentFields}
-          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className={`grid min-w-0 grid-cols-1 sm:grid-cols-2 ${type === "birth" ? "gap-2" : "gap-3"}`}>
             <label className="min-w-0 space-y-1">
               <span className="block text-lg font-bold text-slate-800">
                 {L("আবেদনকারীর নাম *", "Applicant's Name *")}
               </span>
               <Input
-                className="h-14 text-lg placeholder:text-lg"
+                className={type === "birth" ? "h-12 text-base placeholder:text-base" : "h-14 text-lg placeholder:text-lg"}
                 autoComplete="name"
                 maxLength={100}
                 placeholder={L("আবেদনকারীর নাম লিখুন", "Enter applicant's name")}
@@ -1542,10 +1619,22 @@ export function RegForm({
               <label className="block text-lg font-bold text-slate-800" htmlFor="applicant-relationship">
                 {L("আবেদনকারীর সাথে সম্পর্ক *", "Relationship to Applicant *")}
               </label>
-              <Select value={applicantRelationshipBn} onValueChange={setApplicantRelationshipBn} required>
+              <Select
+                value={applicantRelationshipBn}
+                onValueChange={(relationship) => {
+                  setApplicantRelationshipBn(relationship);
+                  if (type !== "birth") return;
+                  if (relationship === "পিতা") {
+                    setApplicantNameBn(father.bn);
+                  } else if (relationship === "মাতা") {
+                    setApplicantNameBn(mother.bn);
+                  }
+                }}
+                required
+              >
                 <SelectTrigger
                   id="applicant-relationship"
-                  className="h-14 w-full min-w-0 px-3 text-lg"
+                  className={`${type === "birth" ? "h-12" : "h-14"} w-full min-w-0 px-3 text-lg`}
                   aria-label={L("আবেদনকারীর সাথে সম্পর্ক", "Relationship to applicant")}
                 >
                   <SelectValue placeholder={L("সম্পর্ক নির্বাচন করুন", "Select relationship")} />
@@ -1576,12 +1665,12 @@ export function RegForm({
           {error}
         </p>
       )}
-      <div className="sticky bottom-0 z-10 col-span-full -mx-2 flex flex-wrap items-center justify-end gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-2 shadow-[0_-6px_16px_-14px_rgba(15,23,42,0.6)]">
-        <div className="ml-auto flex w-full flex-wrap justify-end gap-2 sm:w-auto">
+      <div className="sticky bottom-0 z-10 col-span-full -mx-2 flex flex-wrap items-end justify-end gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-1 py-0 shadow-[0_-6px_16px_-14px_rgba(15,23,42,0.6)]">
+        <div className="ml-auto flex w-full flex-wrap items-end justify-end gap-1 sm:w-auto">
           <Button
             type="button"
             variant="outline"
-            className="min-h-14 flex-1 text-lg sm:flex-none"
+            className="min-h-7 flex-1 px-2 py-0 text-sm sm:flex-none"
             onClick={onCancel}
             disabled={saving}
           >
@@ -1590,7 +1679,7 @@ export function RegForm({
           {onEdit && (
             <Button
               type="button"
-              className="min-h-14 flex-1 bg-amber-500 text-lg text-white hover:bg-amber-600 sm:flex-none"
+              className="min-h-7 flex-1 bg-amber-500 px-2 py-0 text-sm text-white hover:bg-amber-600 sm:flex-none"
               onClick={onEdit}
               disabled={saving}
             >
@@ -1599,7 +1688,7 @@ export function RegForm({
           )}
           <Button
             type="submit"
-            className="min-h-14 flex-1 bg-emerald-600 text-lg text-white hover:bg-emerald-700 sm:flex-none"
+            className="min-h-7 flex-1 bg-emerald-600 px-2 py-0 text-sm text-white hover:bg-emerald-700 sm:flex-none"
             disabled={saving || compressing !== null}
           >
             {saving ? L("সংরক্ষণ হচ্ছে…", "Saving…") : L("সংরক্ষণ করুন", "Save")}
@@ -1627,37 +1716,6 @@ export function RegForm({
               />
             </div>
           )}
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={successOpen}
-        onOpenChange={(open) => {
-          setSuccessOpen(open);
-          if (!open) onSaved();
-        }}
-      >
-        <DialogContent className="max-w-sm rounded-2xl border-emerald-200 p-6">
-          <DialogHeader>
-            <DialogTitle className="text-center text-xl font-bold text-emerald-900">
-              {L("তথ্য সফলভাবে সংরক্ষিত হয়েছে", "Data successfully saved")}
-            </DialogTitle>
-            <DialogDescription className="text-center">
-              {L(
-                "নতুন আবেদন শুরু করতে নিচের বোতামে চাপ দিন।",
-                "Select below to start a fresh application.",
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <Button
-            type="button"
-            className="w-full bg-emerald-600 text-white hover:bg-emerald-700"
-            onClick={() => {
-              setSuccessOpen(false);
-              onSaved();
-            }}
-          >
-            {L("ওকে", "OK")}
-          </Button>
         </DialogContent>
       </Dialog>
       <Dialog open={duplicateOpen} onOpenChange={setDuplicateOpen}>
@@ -1754,7 +1812,7 @@ function EpiAttendanceForm({ onSaved }: { onSaved: () => void }) {
             placeholder="01XXXXXXXXX"
             required
             value={mobile}
-            onChange={(event) => setMobile(event.target.value.replace(/\D/g, "").slice(0, 11))}
+            onChange={(event) => setMobile(normalizeNumericInput(event.target.value, 11))}
           />
         </div>
         <div className="space-y-1">

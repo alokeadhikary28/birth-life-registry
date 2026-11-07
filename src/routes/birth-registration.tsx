@@ -20,7 +20,11 @@ function BirthRegistrationRoute() {
   const { applicationId } = Route.useSearch();
   return (
     <DashboardGate workerLayout={false}>
-      <EntryFormPage type="birth" applicationId={applicationId} />
+      <EntryFormPage
+        type="birth"
+        applicationId={applicationId}
+        routePath="/birth-registration"
+      />
     </DashboardGate>
   );
 }

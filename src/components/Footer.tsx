@@ -7,8 +7,8 @@ export function Footer({ compact = false }: { compact?: boolean }) {
 
   if (compact) {
     return (
-      <footer className="h-16 w-full shrink-0 border-t border-emerald-700 bg-gradient-to-r from-[#70c158] to-[#5cb84b] text-white shadow-[0_-8px_24px_-20px_rgba(15,23,42,0.4)]">
-        <div className="mx-auto flex h-full w-full max-w-none flex-col items-center justify-center gap-1 px-4 text-xs leading-tight max-[360px]:text-[10px] sm:flex-row sm:justify-between sm:gap-3 sm:px-6 sm:text-sm lg:px-8">
+      <footer className="min-h-16 w-full shrink-0 border-t border-emerald-700 bg-gradient-to-r from-[#70c158] to-[#5cb84b] py-1 text-white shadow-[0_-8px_24px_-20px_rgba(15,23,42,0.4)]">
+        <div className="mx-auto flex min-h-14 w-full max-w-none flex-col items-center justify-center gap-1 px-4 text-xs leading-tight max-[360px]:text-[10px] sm:flex-row sm:justify-between sm:gap-3 sm:px-6 sm:text-sm lg:px-8">
           <p className="flex shrink-0 items-center gap-1.5 whitespace-nowrap font-display font-semibold">
             <Landmark className="h-3.5 w-3.5 shrink-0 text-emerald-100" aria-hidden="true" />
             <span>{L("ই-নিবন্ধন ট্র্যাকার", "E-Registration Tracker")}</span>

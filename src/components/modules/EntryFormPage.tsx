@@ -8,22 +8,18 @@ import { scopedCases, useApp } from "@/lib/store";
 export function EntryFormPage({
   type,
   applicationId,
-  routePath,
 }: {
   type: "birth" | "death";
   applicationId?: string | undefined;
-  routePath:
-    | "/birth-entry"
-    | "/birth-registration"
-    | "/death-entry"
-    | "/death-registration";
 }) {
   const { L, user, state } = useApp();
   const navigate = useNavigate();
   const [formInstance, setFormInstance] = useState(0);
+  const [startFreshEntry, setStartFreshEntry] = useState(false);
   const entry = applicationId
     ? scopedCases(state, user).find((item) => item.id === applicationId && item.type === type)
     : undefined;
+  const formEntry = startFreshEntry ? undefined : entry;
 
   if (user?.role !== "worker") {
     return (
@@ -70,16 +66,12 @@ export function EntryFormPage({
       <ModuleNavigation />
       <div className={type === "birth" ? "w-full max-w-full space-y-1" : "space-y-3"}>
         <RegForm
-          key={`${type}-${entry?.id ?? "new"}-${formInstance}`}
+          key={`${type}-${formEntry?.id ?? "new"}-${formInstance}`}
           type={type}
-          entry={entry}
+          entry={formEntry}
           onSaved={() => {
+            setStartFreshEntry(true);
             setFormInstance((instance) => instance + 1);
-            void navigate({
-              to: routePath,
-              search: { applicationId: undefined },
-              replace: true,
-            });
           }}
           onCancel={() => void navigate({ to: "/dashboard" })}
         />

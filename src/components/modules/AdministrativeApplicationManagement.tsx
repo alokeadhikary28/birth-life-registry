@@ -44,13 +44,20 @@ export function AdministrativeApplicationManagement({
   const currentPage = Math.min(page, pageCount);
   const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const updateStatus = async (item: RegCase, nextStatus: Status) => {
+    if (item.status === "completed" && item.police?.directApproval && nextStatus !== "completed") {
+      return;
+    }
     if (nextStatus === "completed") {
       const regNo = window.prompt(L("১৭ সংখ্যার নিবন্ধন নম্বর লিখুন", "Enter the 17-digit registration number"));
       if (!regNo || !/^\d{17}$/.test(regNo.trim())) {
         if (regNo !== null) window.alert(L("নিবন্ধন নম্বরটি অবশ্যই ১৭ সংখ্যার হতে হবে।", "The registration number must contain exactly 17 digits."));
         return;
       }
-      await patchCase(item.id, { status: "completed", regNo: regNo.trim() });
+      await patchCase(item.id, {
+        status: "completed",
+        regNo: regNo.trim(),
+        police: { ...(item.police ?? {}), directApproval: true },
+      });
       return;
     }
     await patchCase(item.id, {
@@ -143,7 +150,7 @@ export function AdministrativeApplicationManagement({
                       {item.status === "pending" && <Button size="sm" variant="outline" onClick={() => void updateStatus(item, "progress")}>{L("প্রক্রিয়াধীন", "Start review")}</Button>}
                       {item.status !== "completed" && item.status !== "rejected" && <Button size="sm" className="bg-emerald-700 hover:bg-emerald-800" onClick={() => void updateStatus(item, "completed")}>{L("নিবন্ধন অনুমোদন", "Approve")}</Button>}
                       {item.status !== "rejected" && item.status !== "completed" && <Button size="sm" variant="outline" className="border-red-200 text-red-700" onClick={() => void updateStatus(item, "rejected")}>{L("বাতিল", "Reject")}</Button>}
-                      {item.status === "completed" && <Button size="sm" variant="outline" onClick={() => void updateStatus(item, "progress")}>{L("অনুমোদন প্রত্যাহার", "Revoke")}</Button>}
+                      {item.status === "completed" && !item.police?.directApproval && <Button size="sm" variant="outline" onClick={() => void updateStatus(item, "progress")}>{L("অনুমোদন প্রত্যাহার", "Revoke")}</Button>}
                     </div>
                   </td>
                 </tr>

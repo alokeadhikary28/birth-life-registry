@@ -48,6 +48,7 @@ export interface User {
   id: string;
   name: Bi;
   role: Role;
+  active?: boolean | undefined;
   mobile?: string | undefined;
   email?: string | undefined;
   password?: string;
@@ -69,11 +70,17 @@ export type Status = "pending" | "progress" | "completed" | "rejected";
 export interface CaseDetails {
   fatherBrn?: string | undefined;
   motherBrn?: string | undefined;
+  fatherDob?: string | undefined;
+  motherDob?: string | undefined;
   birthPlace?: Bi | undefined;
   deathPlace?: Bi | undefined;
   presentAddress?: Bi | undefined;
   permanentAddress?: Bi | undefined;
   addressHolding?: string | undefined;
+  presentVillageId?: string | undefined;
+  permanentVillageId?: string | undefined;
+  presentAddressHolding?: string | undefined;
+  permanentAddressHolding?: string | undefined;
   spouseName?: Bi | undefined;
   applicantName?: Bi | undefined;
   applicantRelationship?: Bi | undefined;
@@ -81,6 +88,31 @@ export interface CaseDetails {
   applicantRelationshipBn?: string | undefined;
   childBrn?: string | undefined;
   correctedAt?: string | undefined;
+}
+
+export interface FieldVisitDay {
+  day: 1 | 2 | 3 | 4;
+  capturedAt: string;
+  latitude: number;
+  longitude: number;
+  photo: {
+    name: string;
+    size: number;
+    path?: string | undefined;
+    dataUrl?: string | undefined;
+  };
+}
+
+export interface PoliceTask {
+  epiCard?: boolean | undefined;
+  parentNid?: boolean | undefined;
+  collected?: boolean | undefined;
+  collectedAt?: number | undefined;
+  assignedPoliceId?: string | undefined;
+  assignedAt?: string | undefined;
+  assignedBy?: string | undefined;
+  fieldVisitDays?: FieldVisitDay[] | undefined;
+  directApproval?: boolean | undefined;
 }
 
 export interface CaseFileMetadata {
@@ -119,8 +151,7 @@ export interface RegCase {
   status: Status;
   regNo?: string | undefined;
   remarks: Remark[];
-  police?:
-    undefined | { epiCard: boolean; parentNid: boolean; collected: boolean; collectedAt?: number };
+  police?: PoliceTask | undefined;
   createdBy: string;
   upazilaId: string;
   stationId?: string | undefined;

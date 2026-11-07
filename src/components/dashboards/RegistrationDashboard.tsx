@@ -1243,6 +1243,7 @@ export function RegistrationDashboard({
   const [activeCard, setActiveCard] = useState<{ kind: "metric" | "action"; id: string } | null>(
     null,
   );
+  const [formInstance, setFormInstance] = useState(0);
   const [correctionSearch, setCorrectionSearch] = useState("");
   const stationMonthlyMetrics = useAssignedRegistrationTarget();
   const [localPreviewTarget, setLocalPreviewTarget] = useState<{
@@ -2417,15 +2418,16 @@ export function RegistrationDashboard({
                 <div className={formType === "birth" ? "w-full max-w-full space-y-1" : "space-y-3"}>
                   {isEntryCard || editEntry ? (
                     <RegForm
-                      key={editEntry?.id ?? formType}
+                      key={`${editEntry?.id ?? formType}-${formInstance}`}
                       type={formType}
                       entry={editEntry ?? undefined}
                       onSaved={() => {
                         setEditEntry(null);
                         setActiveCard({
                           kind: "action",
-                          id: formType === "birth" ? "birth-list" : "death-list",
+                          id: formType === "birth" ? "birth-entry" : "death-entry",
                         });
+                        setFormInstance((instance) => instance + 1);
                       }}
                       onCancel={editEntry ? () => setEditEntry(null) : closeDialog}
                       onEdit={() =>

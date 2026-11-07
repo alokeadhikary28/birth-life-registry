@@ -8,9 +8,15 @@ import { scopedCases, useApp } from "@/lib/store";
 export function EntryFormPage({
   type,
   applicationId,
+  routePath,
 }: {
   type: "birth" | "death";
   applicationId?: string | undefined;
+  routePath:
+    | "/birth-entry"
+    | "/birth-registration"
+    | "/death-entry"
+    | "/death-registration";
 }) {
   const { L, user, state } = useApp();
   const navigate = useNavigate();
@@ -70,8 +76,9 @@ export function EntryFormPage({
           onSaved={() => {
             setFormInstance((instance) => instance + 1);
             void navigate({
-              to: type === "birth" ? "/birth-entry" : "/death-entry",
+              to: routePath,
               search: { applicationId: undefined },
+              replace: true,
             });
           }}
           onCancel={() => void navigate({ to: "/dashboard" })}

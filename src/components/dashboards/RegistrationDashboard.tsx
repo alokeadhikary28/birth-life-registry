@@ -1994,6 +1994,10 @@ export function RegistrationDashboard({
   const toggleRegistered = async (item: RegCase) => {
     if (readOnlyPolicyPanel) return;
     if (user?.role !== "admin" && !isLocalAdminPreview) return;
+    if (item.status === "completed" && item.police?.directApproval) {
+      toast.error(L("সরাসরি অনুমোদিত আবেদন স্থায়ীভাবে সম্পন্ন হয়েছে", "Directly approved applications are permanently completed"));
+      return;
+    }
     if (isLocalAdminPreview || demoMode) {
       toast.error(
         L(
@@ -2022,7 +2026,11 @@ export function RegistrationDashboard({
       );
       return;
     }
-    if (await patchCase(item.id, { status: "completed", regNo: regNo.trim() })) {
+    if (await patchCase(item.id, {
+      status: "completed",
+      regNo: regNo.trim(),
+      police: { ...(item.police ?? {}), directApproval: true },
+    })) {
       toast.success(L("নিবন্ধিত হয়েছে", "Registered"));
     }
   };

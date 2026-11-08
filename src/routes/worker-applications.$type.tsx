@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { DashboardGate } from "@/components/dashboards/DashboardGate";
+import { ProtectedRoute } from "@/components/dashboards/ProtectedRoute";
 import { WorkerApplicationListPage } from "@/components/modules/WorkerApplicationListPage";
 import { BirthRegList } from "@/components/modules/BirthRegList";
 import { DeathRegList } from "@/components/modules/DeathRegList";
@@ -36,29 +36,45 @@ function WorkerApplicationsRoute() {
   const previewRole = search["role"] === "up_secretary" ? "admin" : "worker";
   return (
     <AdministrativeErrorBoundary>
-      <DashboardGate workerLayout={false} developmentPreviewRole={previewRole}>
+      <ProtectedRoute
+        allowedRoles={["admin", "worker", "police"]}
+        workerLayout={false}
+        developmentPreviewRole={previewRole}
+      >
         {caseLoadError ? (
-          <section className="mx-auto my-8 max-w-lg rounded-xl border border-amber-200 bg-amber-50 p-6 text-center text-amber-950" role="alert">
-            <h1 className="font-display text-lg font-bold">{L("আবেদন তালিকা লোড করা যায়নি", "Applications could not be loaded")}</h1>
-            <p className="mt-2 text-sm">{L("আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।", "Check your connection and try again.")}</p>
+          <section
+            className="mx-auto my-8 max-w-lg rounded-xl border border-amber-200 bg-amber-50 p-6 text-center text-amber-950"
+            role="alert"
+          >
+            <h1 className="font-display text-lg font-bold">
+              {L("আবেদন তালিকা লোড করা যায়নি", "Applications could not be loaded")}
+            </h1>
+            <p className="mt-2 text-sm">
+              {L(
+                "আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।",
+                "Check your connection and try again.",
+              )}
+            </p>
             <Button className="mt-4" variant="outline" onClick={() => void refresh()}>
               {L("আবার চেষ্টা করুন", "Try again")}
             </Button>
           </section>
-        ) : registrationType ? user?.role === "admin" ? (
-          registrationType === "birth" ? (
-            <BirthRegList cases={administrativeCases} onHome={() => window.history.back()} />
+        ) : registrationType ? (
+          user?.role === "admin" ? (
+            registrationType === "birth" ? (
+              <BirthRegList cases={administrativeCases} onHome={() => window.history.back()} />
+            ) : (
+              <DeathRegList cases={administrativeCases} onHome={() => window.history.back()} />
+            )
           ) : (
-            <DeathRegList cases={administrativeCases} onHome={() => window.history.back()} />
+            <WorkerApplicationListPage type={registrationType} />
           )
-        ) : (
-          <WorkerApplicationListPage type={registrationType} />
         ) : (
           <p className="px-4 py-8 text-center text-muted-foreground">
             {L("এই আবেদন ধরনটি সমর্থিত নয়।", "Unsupported application type.")}
           </p>
         )}
-      </DashboardGate>
+      </ProtectedRoute>
     </AdministrativeErrorBoundary>
   );
 }

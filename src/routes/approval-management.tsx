@@ -1,8 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { DashboardGate } from "@/components/dashboards/DashboardGate";
+import { ProtectedRoute } from "@/components/dashboards/ProtectedRoute";
 import { ApprovalManagement } from "@/components/modules/ApprovalManagement";
-import { ModuleNavigation } from "@/components/modules/ModuleNavigation";
-import { useApp } from "@/lib/store";
 
 export const Route = createFileRoute("/approval-management")({
   head: () => ({
@@ -15,19 +13,9 @@ export const Route = createFileRoute("/approval-management")({
 });
 
 function ApprovalRoute() {
-  const { L, user } = useApp();
   return (
-    <DashboardGate>
-      {user?.role === "super" ? (
-        <ApprovalManagement />
-      ) : (
-        <main className="mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8">
-          <ModuleNavigation />
-          <p className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
-            {L("এই পাতায় প্রবেশের অনুমতি নেই", "You don't have access to this page")}
-          </p>
-        </main>
-      )}
-    </DashboardGate>
+    <ProtectedRoute allowedRoles={["super"]}>
+      <ApprovalManagement />
+    </ProtectedRoute>
   );
 }

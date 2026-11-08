@@ -430,7 +430,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       supabase.from("profiles").select("*").eq("id", au.id).maybeSingle(),
       supabase.from("user_roles").select("role").eq("user_id", au.id),
     ]);
-    if (!p || !r?.length || !p.active) {
+    if (!p || !r?.length || !p.active || p.status !== "active") {
       toast.error(
         p?.status === "pending"
           ? L("Waiting for Approval — আপনার অ্যাকাউন্ট অনুমোদনের অপেক্ষায় আছে।", "Waiting for Approval — your account is awaiting review.")
@@ -441,7 +441,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await supabase.auth.signOut(); setUser(null); setAuthReady(true); return;
     }
     const role = r[0]!.role as Role;
-    setUser({ id: au.id, name: { bn: p.name_bn, en: p.name_en }, role, mobile: p.mobile ?? undefined, email: p.email ?? undefined,
+    setUser({ id: au.id, name: { bn: p.name_bn, en: p.name_en }, role, active: p.active, mobile: p.mobile ?? undefined, email: p.email ?? undefined,
       upazilaId: p.upazila_id ?? "", stationId: p.station_id ?? p.union_id ?? undefined, unionId: p.union_id ?? undefined, ward: p.ward ?? undefined });
     let m: Mfa = "ok";
     if (PRIV.includes(role)) {

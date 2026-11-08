@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, MapPinned } from "lucide-react";
-import { DashboardGate } from "@/components/dashboards/DashboardGate";
+import { ProtectedRoute } from "@/components/dashboards/ProtectedRoute";
 import { VillageManager } from "@/components/dashboards/Admin";
 import { useApp } from "@/lib/store";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,7 +17,7 @@ function UnionMasterRoute() {
   const { L, user, state, authReady, demoMode, activeUnionId, setActiveUnionId } = useApp();
 
   return (
-    <DashboardGate fitViewport={false} flushViewport={false} developmentPreviewRole="admin">
+    <ProtectedRoute allowedRoles={["admin"]} fitViewport={false} flushViewport={false} developmentPreviewRole="admin">
       <main className="mx-auto w-full max-w-6xl space-y-5 px-4 py-6 sm:px-6 lg:px-8">
         <Link
           to="/"
@@ -92,6 +92,6 @@ function UnionMasterRoute() {
           return <VillageManager upazila={upazila} union={union} />;
         })()}
       </main>
-    </DashboardGate>
+    </ProtectedRoute>
   );
 }

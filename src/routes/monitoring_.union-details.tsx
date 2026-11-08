@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { DashboardGate } from "@/components/dashboards/DashboardGate";
+import { ProtectedRoute } from "@/components/dashboards/ProtectedRoute";
 import { UnionOverview } from "@/components/dashboards/UnionOverview";
 
 export const Route = createFileRoute("/monitoring_/union-details")({
@@ -18,8 +18,11 @@ export const Route = createFileRoute("/monitoring_/union-details")({
 function UnionDetailsRoute() {
   const { unionId } = Route.useSearch();
   return (
-    <DashboardGate workerLayout={false}>
+    <ProtectedRoute
+      allowedRoles={["worker", "admin", "police", "uno", "district"]}
+      workerLayout={false}
+    >
       <UnionOverview unionId={unionId} />
-    </DashboardGate>
+    </ProtectedRoute>
   );
 }

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { DashboardGate } from "@/components/dashboards/DashboardGate";
+import { ProtectedRoute } from "@/components/dashboards/ProtectedRoute";
 import { EntryFormPage } from "@/components/modules/EntryFormPage";
 
 export const Route = createFileRoute("/birth-entry")({
@@ -19,8 +19,8 @@ export const Route = createFileRoute("/birth-entry")({
 function BirthEntryRoute() {
   const { applicationId } = Route.useSearch();
   return (
-    <DashboardGate workerLayout={false}>
+    <ProtectedRoute workerLayout={false}>
       <EntryFormPage type="birth" applicationId={applicationId} />
-    </DashboardGate>
+    </ProtectedRoute>
   );
 }

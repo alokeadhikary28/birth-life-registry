@@ -299,51 +299,76 @@ export function ApprovalManagement() {
         </div>
       ) : (
         <div className="space-y-3">
-          {requests.map((request) => (
-            <article
-              key={request.id}
-              className="flex flex-col gap-4 rounded-xl border border-emerald-200 bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="min-w-0">
-                <h2 className="font-semibold">{request.fullName}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {request.category}
-                  {request.requestedPosition && (
-                    <>
-                      {" · "}
-                      {EXECUTIVE_POSITIONS.find(
-                        (position) => position.role === request.requestedPosition,
-                      )?.bn ?? request.requestedPosition}
-                    </>
-                  )}
-                  {" · "}
-                  {roleName(request.role, L)} · {request.unionName}
-                </p>
-                {request.officeName && (
-                  <p className="text-sm text-muted-foreground">{request.officeName}</p>
-                )}
-                <p className="break-all text-sm">{request.email ?? request.mobile}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {L("আবেদনের তারিখ", "Submitted")} ·{" "}
-                  {new Date(request.createdAt).toLocaleDateString(L("bn-BD", "en-US"))}
-                </p>
-              </div>
-              <div className="flex shrink-0 gap-2">
-                <Button disabled={busyId !== null} onClick={() => void approveRequest(request)}>
-                  <Check className="mr-1 h-4 w-4" />
-                  {L("অনুমোদন ও সক্রিয় করুন", "Approve & activate")}
-                </Button>
-                <Button
-                  variant="destructive"
-                  disabled={busyId !== null}
-                  onClick={() => void dismissRequest(request)}
-                >
-                  <X className="mr-1 h-4 w-4" />
-                  {L("প্রত্যাখ্যান", "Reject")}
-                </Button>
-              </div>
-            </article>
-          ))}
+          {requests.length > 0 && (
+            <div className="w-full overflow-x-auto rounded-xl border border-emerald-200 bg-card">
+              <table className="w-full min-w-[960px] border-collapse text-left text-sm">
+                <caption className="sr-only">
+                  {L("অপেক্ষমাণ কর্মী নিবন্ধনের অনুরোধ", "Pending staff registration requests")}
+                </caption>
+                <thead className="bg-emerald-50 text-emerald-950">
+                  <tr>
+                    {[
+                      L("পূর্ণ নাম", "Full name"),
+                      L("ইমেইল", "Email"),
+                      L("ফোন", "Phone"),
+                      L("অফিসের নাম", "Office name"),
+                      L("পদ / ক্যাটাগরি", "Role / category"),
+                      L("স্ট্যাটাস", "Status"),
+                      L("কার্যক্রম", "Actions"),
+                    ].map((heading) => (
+                      <th key={heading} scope="col" className="whitespace-nowrap border-b px-3 py-3 font-semibold">
+                        {heading}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {requests.map((request) => (
+                    <tr key={request.id} className="border-b last:border-b-0">
+                      <td className="px-3 py-3 font-semibold">{request.fullName}</td>
+                      <td className="max-w-56 break-all px-3 py-3">{request.email ?? "—"}</td>
+                      <td className="whitespace-nowrap px-3 py-3">{request.mobile ?? "—"}</td>
+                      <td className="px-3 py-3">{request.officeName ?? "—"}</td>
+                      <td className="px-3 py-3">
+                        <div>{request.category}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {request.requestedPosition
+                            ? EXECUTIVE_POSITIONS.find(
+                                (position) => position.role === request.requestedPosition,
+                              )?.bn ?? request.requestedPosition
+                            : `${roleName(request.role, L)} · ${request.unionName}`}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className="inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900">
+                          {L("অপেক্ষমাণ", "Pending")}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex gap-2">
+                          <Button
+                            disabled={busyId !== null}
+                            onClick={() => void approveRequest(request)}
+                          >
+                            <Check className="mr-1 h-4 w-4" />
+                            {L("অনুমোদন ও সক্রিয় করুন", "Approve & activate")}
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            disabled={busyId !== null}
+                            onClick={() => void dismissRequest(request)}
+                          >
+                            <X className="mr-1 h-4 w-4" />
+                            {L("প্রত্যাখ্যান", "Reject")}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           {applicants.map((applicant) => (
             <article
               key={applicant.id}

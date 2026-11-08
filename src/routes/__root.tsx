@@ -156,6 +156,7 @@ function RootComponent() {
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Header />
       <main
+        suppressHydrationWarning={true}
         className={
           dashboardViewport
             ? "dashboard-viewport box-border flex min-h-0 flex-col pt-[var(--app-header-height,9rem)]"

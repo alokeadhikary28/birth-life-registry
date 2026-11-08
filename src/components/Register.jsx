@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,7 @@ const initialForm = {
   officeName: "",
   category: "স্বাস্থ্যকর্মী",
   requestedPosition: "",
-  jurisdictionId: "", // ইউনিয়ন বা অন্যান্য প্রশাসনিক এলাকার আইডি
+  jurisdictionId: "",
 };
 
 export default function Register() {
@@ -36,17 +36,22 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
 
+  // ১. শতভাগ ক্লায়েন্ট-সাইড রেন্ডারিং নিশ্চিত করার জন্য স্টেট
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   const updateField = (field, value) => {
     setFormData((current) => ({ ...current, [field]: value }));
   };
 
-  // পদবি বা ক্যাটাগরি অনুযায়ী জুডিসিকিউশন বা এলাকার লেবেল নির্ধারণ
   const getJurisdictionLabel = () => {
     if (formData.category !== EXECUTIVE_CATEGORY) {
       return { bn: "ইউনিয়ন", en: "Union" };
     }
     
-    // নির্বাহী প্যানেলের বিভিন্ন পদের জন্য উপযুক্ত প্রশাসনিক এলাকার নাম
     switch (formData.requestedPosition) {
       case "uno":
         return { bn: "উপজেলা", en: "Upazila" };
@@ -133,11 +138,16 @@ export default function Register() {
     }
   };
 
+  // ২. সার্ভার সাইডে রেন্ডার হওয়ার সময় একদম খালি অংশ রিটার্ন করা যাতে হাইড্রেশন মিসম্যাচ না ঘটে
+  if (!isClient) {
+    return <div className="py-8 text-center text-muted-foreground">লোড হচ্ছে...</div>;
+  }
+
   return (
     <form className="space-y-4" onSubmit={(event) => void submit(event)}>
       <p className="text-lg leading-7 text-muted-foreground">
         {L(
-          "নাম, ইমেইল, ভূমিকা ও এলাকা দিয়ে আবেদন করুন। এটি শুধু অনুমোদনের অনুরোধ—এখনই কোনো অ্যাকাউন্ট তৈরি হবে না।",
+          "নাম, ইমেইল, ভূমিকা ও এলাকা দিয়ে আবেদন করুন। এটি শুধু অনুমোদনের অনুরোধ—এখনই কোনো অ্যাকাউন্ট তৈরি হবে না।",
           "Apply with your name, email, role, and jurisdiction. This submits an approval request; it does not create an account.",
         )}
       </p>
@@ -259,7 +269,7 @@ export default function Register() {
               value={formData.requestedPosition}
               onValueChange={(value) => {
                 updateField("requestedPosition", value);
-                updateField("jurisdictionId", ""); // পদ পরিবর্তন করলে এলাকা রিসেট হবে
+                updateField("jurisdictionId", "");
               }}
               disabled={loading}
             >
@@ -281,7 +291,6 @@ export default function Register() {
         )}
       </div>
 
-      {/* গতিশীল এলাকা নির্বাচন ফিল্ড (ইউনিয়ন অথবা পদবি অনুযায়ী উপজেলা/জেলা/বিভাগ/পৌরসভা) */}
       <div className="space-y-1.5">
         <Label className="text-lg" htmlFor="registration-jurisdiction">
           {L(jurisdictionLabel.bn, jurisdictionLabel.en)}
@@ -305,7 +314,6 @@ export default function Register() {
                 </SelectItem>
               ))
             ) : (
-              // নির্বাহী প্যানেলের জন্য ডেমো বা সংশ্লিষ্ট এলাকার লিস্ট (প্রয়োজন অনুযায়ী স্ট্যাটিক বা ডাইনামিক ডেটা দিতে পারেন)
               <>
                 <SelectItem className="text-lg" value="manirampur_upazila">মণিরামপুর উপজেলা</SelectItem>
                 <SelectItem className="text-lg" value="jashore_district">যশোর জেলা</SelectItem>

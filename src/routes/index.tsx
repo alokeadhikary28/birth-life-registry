@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { RegistrationDashboard } from "@/components/dashboards/RegistrationDashboard";
+import { ClientOnly } from "@/components/ClientOnly";
 import {
   EXECUTIVE_ROLE_BY_POSITION,
   isPreviewRole,
@@ -57,21 +58,29 @@ function Index() {
     typeof window !== "undefined" &&
     (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
   return (
-    <RegistrationDashboard
-      key={`${user?.id ?? "preview"}:${preview ?? "main"}:${role}`}
-      role={role}
-      localAdminPreview={localAdminPreview}
-      {...(preview ? { simulationRole: preview } : {})}
-      {...(action ? { initialAction: action } : {})}
-      onActionDismiss={() => {
-        void navigate({
-          to: "/",
-          search: (previous) => {
-            const { action: _action, ...rest } = previous;
-            return rest;
-          },
-        });
-      }}
-    />
+    <ClientOnly
+      fallback={
+        <div className="flex min-h-[40svh] items-center justify-center text-muted-foreground" role="status">
+          …
+        </div>
+      }
+    >
+      <RegistrationDashboard
+        key={`${user?.id ?? "preview"}:${preview ?? "main"}:${role}`}
+        role={role}
+        localAdminPreview={localAdminPreview}
+        {...(preview ? { simulationRole: preview } : {})}
+        {...(action ? { initialAction: action } : {})}
+        onActionDismiss={() => {
+          void navigate({
+            to: "/",
+            search: (previous) => {
+              const { action: _action, ...rest } = previous;
+              return rest;
+            },
+          });
+        }}
+      />
+    </ClientOnly>
   );
 }

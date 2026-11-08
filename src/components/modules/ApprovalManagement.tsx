@@ -15,12 +15,18 @@ import { EXECUTIVE_POSITIONS, type ExecutivePreviewRole } from "@/lib/dashboard-
 import { useApp } from "@/lib/store";
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 type StaffRole = "worker" | "police";
 =======
+=======
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
 type FieldStaffRole = "worker" | "police";
 type StaffRole = FieldStaffRole | "admin" | "uno" | "district" | "super";
 type RegistrationCategory =
   "স্বাস্থ্যকর্মী" | "গ্রাম পুলিশ" | "ইউপি প্রশাসনিক কর্মকর্তা" | "উচ্চ পর্যায়ের নির্বাহী প্যানেল";
+<<<<<<< HEAD
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
+=======
 >>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
 
 type Applicant = {
@@ -30,7 +36,11 @@ type Applicant = {
   email: string | null;
   mobile: string | null;
 <<<<<<< HEAD
+<<<<<<< HEAD
   role: StaffRole;
+=======
+  role: FieldStaffRole;
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
 =======
   role: FieldStaffRole;
 >>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
@@ -41,9 +51,12 @@ type RegistrationRequest = {
   id: string;
   fullName: string;
 <<<<<<< HEAD
+<<<<<<< HEAD
   mobile: string;
   role: StaffRole;
 =======
+=======
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
   email: string | null;
   mobile: string | null;
   role: StaffRole;
@@ -51,6 +64,9 @@ type RegistrationRequest = {
   requestedPosition: ExecutivePreviewRole | null;
   officeName: string | null;
   upazilaId: string;
+<<<<<<< HEAD
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
+=======
 >>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
   unionId: string;
   unionName: string;
@@ -59,12 +75,18 @@ type RegistrationRequest = {
 
 function roleName(role: StaffRole, L: (bn: string, en: string) => string) {
 <<<<<<< HEAD
+<<<<<<< HEAD
   return role === "worker" ? L("স্বাস্থ্যকর্মী", "Health Worker") : L("গ্রাম পুলিশ", "Gram Police");
 =======
+=======
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
   if (role === "worker") return L("স্বাস্থ্যকর্মী", "Health Worker");
   if (role === "police") return L("গ্রাম পুলিশ", "Gram Police");
   if (role === "admin") return L("ইউপি প্রশাসনিক কর্মকর্তা", "UP Administrative Officer");
   return L("উচ্চ পর্যায়ের নির্বাহী প্যানেল", "Higher-Level Executive Panel");
+<<<<<<< HEAD
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
+=======
 >>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
 }
 
@@ -80,10 +102,14 @@ export function ApprovalManagement() {
   const [error, setError] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 <<<<<<< HEAD
+<<<<<<< HEAD
   const upazila = state.upazilas.find((item) => item.id === user?.upazilaId);
   const assignedUnion = upazila?.unions.find(
     (item) => item.id === (user?.stationId ?? user?.unionId),
   );
+=======
+  const isSuperAdmin = user?.role === "super";
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
 =======
   const isSuperAdmin = user?.role === "super";
 >>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
@@ -115,8 +141,11 @@ export function ApprovalManagement() {
           result.requests.filter(
             (request): request is RegistrationRequest =>
 <<<<<<< HEAD
+<<<<<<< HEAD
               (request.role === "worker" || request.role === "police") &&
 =======
+=======
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
               (request.role === "worker" ||
                 request.role === "police" ||
                 request.role === "admin" ||
@@ -127,6 +156,9 @@ export function ApprovalManagement() {
                 request.category === "গ্রাম পুলিশ" ||
                 request.category === "ইউপি প্রশাসনিক কর্মকর্তা" ||
                 request.category === "উচ্চ পর্যায়ের নির্বাহী প্যানেল") &&
+<<<<<<< HEAD
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
+=======
 >>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
               typeof request.unionId === "string",
           ),
@@ -157,8 +189,13 @@ export function ApprovalManagement() {
           nameBn: request.fullName,
           nameEn: request.fullName,
 <<<<<<< HEAD
+<<<<<<< HEAD
           contact: request.mobile,
           upazilaId: user.upazilaId,
+=======
+          contact: request.email ?? request.mobile ?? "",
+          upazilaId: request.upazilaId,
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
 =======
           contact: request.email ?? request.mobile ?? "",
           upazilaId: request.upazilaId,
@@ -186,8 +223,11 @@ export function ApprovalManagement() {
       }
       toast.success(
 <<<<<<< HEAD
+<<<<<<< HEAD
         L("অনুরোধ অনুমোদিত; অ্যাকাউন্ট সক্রিয় হয়েছে", "Request approved; the account is active"),
 =======
+=======
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
         request.email
           ? L(
               "অনুরোধ অনুমোদিত; পাসওয়ার্ড সেট করার লিংক ইমেইলে পাঠানো হয়েছে",
@@ -197,6 +237,9 @@ export function ApprovalManagement() {
               "অনুরোধ অনুমোদিত; অ্যাকাউন্ট সক্রিয় হয়েছে",
               "Request approved; the account is active",
             ),
+<<<<<<< HEAD
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
+=======
 >>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
       );
       if (result.warning === "audit_failed") {
@@ -299,10 +342,14 @@ export function ApprovalManagement() {
       <PageTitle
         title={L("অনুমোদন ব্যবস্থাপনা", "Staff approval")}
 <<<<<<< HEAD
+<<<<<<< HEAD
         sub={L(
           `আপনার ইউনিয়ন${assignedUnion ? ` · ${assignedUnion.bn}` : ""} এর অপেক্ষমাণ কর্মী নিবন্ধন`,
           `Pending staff registrations${assignedUnion ? ` · ${assignedUnion.en}` : ""}`,
         )}
+=======
+        sub={L("সকল এলাকার অপেক্ষমাণ কর্মী নিবন্ধন", "Pending staff registrations from all areas")}
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
 =======
         sub={L("সকল এলাকার অপেক্ষমাণ কর্মী নিবন্ধন", "Pending staff registrations from all areas")}
 >>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
@@ -334,15 +381,21 @@ export function ApprovalManagement() {
         <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground">
           {L(
 <<<<<<< HEAD
+<<<<<<< HEAD
             "আপনার ইউনিয়নে অপেক্ষমাণ কর্মী নিবন্ধন নেই",
             "There are no pending staff registrations in your union",
 =======
+=======
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
             isSuperAdmin
               ? "অপেক্ষমাণ নিবন্ধনের অনুরোধ নেই"
               : "আপনার ইউনিয়নে অপেক্ষমাণ কর্মী নিবন্ধন নেই",
             isSuperAdmin
               ? "There are no pending registration requests"
               : "There are no pending staff registrations in your union",
+<<<<<<< HEAD
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
+=======
 >>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
           )}
         </div>
@@ -357,10 +410,13 @@ export function ApprovalManagement() {
                 <h2 className="font-semibold">{request.fullName}</h2>
                 <p className="text-sm text-muted-foreground">
 <<<<<<< HEAD
+<<<<<<< HEAD
                   {roleName(request.role, L)} · {request.unionName}
                 </p>
                 <p className="break-all text-sm">{request.mobile}</p>
 =======
+=======
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
                   {request.category}
                   {request.requestedPosition && (
                     <>
@@ -377,6 +433,9 @@ export function ApprovalManagement() {
                   <p className="text-sm text-muted-foreground">{request.officeName}</p>
                 )}
                 <p className="break-all text-sm">{request.email ?? request.mobile}</p>
+<<<<<<< HEAD
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
+=======
 >>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
                 <p className="mt-1 text-xs text-muted-foreground">
                   {L("আবেদনের তারিখ", "Submitted")} ·{" "}

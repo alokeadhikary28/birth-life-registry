@@ -261,7 +261,10 @@
       "tag": "0036_single_tier_staff_approval",
       "breakpoints": true
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
     },
     {
       "idx": 37,
@@ -283,6 +286,9 @@
       "when": 1794000300000,
       "tag": "0039_registration_executive_positions",
       "breakpoints": true
+<<<<<<< HEAD
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
+=======
 >>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
     }
   ]

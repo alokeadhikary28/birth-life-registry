@@ -373,6 +373,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           name: { bn: p.name_bn, en: p.name_en },
           role: role ?? "worker",
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+          active: p.active,
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
 =======
           active: p.active,
 >>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9

@@ -31,6 +31,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PasswordLoginForm } from "@/components/PasswordLoginForm";
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+import Register from "@/components/Register";
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
 =======
 import Register from "@/components/Register";
 >>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
@@ -462,6 +466,7 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
   const nav = useNavigate();
   const sendOtp = useServerFn(sendPhoneOtp), verifyOtp = useServerFn(verifyPhoneOtp);
 <<<<<<< HEAD
+<<<<<<< HEAD
   const submitRegistrationRequest = useServerFn(submitStaffRegistrationRequest);
   const [mobile, setMobile] = useState(""); const [otp, setOtp] = useState(""); const [sent, setSent] = useState(false);
   const [fullName, setFullName] = useState("");
@@ -469,6 +474,9 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
   const [requestRole, setRequestRole] = useState<"worker" | "police">("worker");
   const [requestUnion, setRequestUnion] = useState("");
   const [requestSubmitted, setRequestSubmitted] = useState(false);
+=======
+  const [mobile, setMobile] = useState(""); const [otp, setOtp] = useState(""); const [sent, setSent] = useState(false);
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
 =======
   const [mobile, setMobile] = useState(""); const [otp, setOtp] = useState(""); const [sent, setSent] = useState(false);
 >>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
@@ -616,6 +624,7 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
               )}
             </>}
 <<<<<<< HEAD
+<<<<<<< HEAD
           </TabsContent>
           <TabsContent value="pw" className="pt-2">
             <>
@@ -628,6 +637,8 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
             </>
           </TabsContent>
 =======
+=======
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
               </TabsContent>
               <TabsContent value="pw" className="space-y-3 pt-2">
                 <p className="text-xs text-muted-foreground">{L("অনুমোদিত কর্মীরা ইমেইল ও পাসওয়ার্ড দিয়ে লগইন করুন", "Approved staff can sign in with email and password")}</p>
@@ -637,6 +648,9 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
                   onStart={() => setLoginMessage(null)}
                 />
               </TabsContent>
+<<<<<<< HEAD
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
+=======
 >>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
             </Tabs>
           </TabsContent>

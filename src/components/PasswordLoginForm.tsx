@@ -9,6 +9,11 @@ import { passwordSignIn, requestPasswordReset } from "@/lib/auth.functions";
 import { useApp } from "@/lib/store";
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+const fieldClassName = "border-slate-300 bg-slate-50 shadow-sm focus-visible:ring-emerald-700";
+
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
 =======
 const fieldClassName = "border-slate-300 bg-slate-50 shadow-sm focus-visible:ring-emerald-700";
 
@@ -97,8 +102,14 @@ export function PasswordLoginForm({
 
       <div className="space-y-1.5">
 <<<<<<< HEAD
+<<<<<<< HEAD
         <Label htmlFor="password-login-email">{L("ইউজারনেম / ইমেইল", "Username / Email")}</Label>
         <Input
+=======
+        <Label htmlFor="password-login-email">{L("ইমেইল (লগইন আইডি)", "Email (login ID)")}</Label>
+        <Input
+          className={fieldClassName}
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
 =======
         <Label htmlFor="password-login-email">{L("ইমেইল (লগইন আইডি)", "Email (login ID)")}</Label>
         <Input
@@ -123,7 +134,11 @@ export function PasswordLoginForm({
             type={showPassword ? "text" : "password"}
             autoComplete="current-password"
 <<<<<<< HEAD
+<<<<<<< HEAD
             className="pr-11"
+=======
+            className={`${fieldClassName} pr-11`}
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
 =======
             className={`${fieldClassName} pr-11`}
 >>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9

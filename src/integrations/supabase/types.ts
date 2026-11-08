@@ -351,8 +351,11 @@ export type Database = {
           processing_at: string | null
           processing_by: string | null
 <<<<<<< HEAD
+<<<<<<< HEAD
           role: "worker" | "police"
 =======
+=======
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
           requested_position:
             | "municipal_executive_officer"
             | "uno"
@@ -364,6 +367,9 @@ export type Database = {
             | "registrar_general"
             | null
           role: "worker" | "police" | "admin" | "uno" | "district" | "super"
+<<<<<<< HEAD
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
+=======
 >>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
           reviewed_at: string | null
           reviewed_by: string | null
@@ -386,8 +392,11 @@ export type Database = {
           processing_at?: string | null
           processing_by?: string | null
 <<<<<<< HEAD
+<<<<<<< HEAD
           role: "worker" | "police"
 =======
+=======
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
           requested_position?:
             | "municipal_executive_officer"
             | "uno"
@@ -399,6 +408,9 @@ export type Database = {
             | "registrar_general"
             | null
           role: "worker" | "police" | "admin" | "uno" | "district" | "super"
+<<<<<<< HEAD
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
+=======
 >>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -421,8 +433,11 @@ export type Database = {
           processing_at?: string | null
           processing_by?: string | null
 <<<<<<< HEAD
+<<<<<<< HEAD
           role?: "worker" | "police"
 =======
+=======
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
           requested_position?:
             | "municipal_executive_officer"
             | "uno"
@@ -434,6 +449,9 @@ export type Database = {
             | "registrar_general"
             | null
           role?: "worker" | "police" | "admin" | "uno" | "district" | "super"
+<<<<<<< HEAD
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
+=======
 >>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
           reviewed_at?: string | null
           reviewed_by?: string | null

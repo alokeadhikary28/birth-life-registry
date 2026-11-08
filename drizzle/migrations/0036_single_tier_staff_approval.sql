@@ -1,5 +1,9 @@
 ALTER TABLE public.staff_registration_requests
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+  DROP CONSTRAINT IF EXISTS staff_registration_requests_status_check,
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
 =======
   DROP CONSTRAINT IF EXISTS staff_registration_requests_status_check,
 >>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9

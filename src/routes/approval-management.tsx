@@ -19,7 +19,11 @@ function ApprovalRoute() {
   return (
     <DashboardGate>
 <<<<<<< HEAD
+<<<<<<< HEAD
       {user?.role === "admin" ? (
+=======
+      {user?.role === "super" ? (
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
 =======
       {user?.role === "super" ? (
 >>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9

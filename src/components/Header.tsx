@@ -30,6 +30,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PasswordLoginForm } from "@/components/PasswordLoginForm";
+<<<<<<< HEAD
+=======
+import Register from "@/components/Register";
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
 import { roleLabel, useApp } from "@/lib/store";
 import { getStationsForUpazila, MONIRAMPUR_STATIONS } from "@/lib/monirampur-stations";
 import {
@@ -42,7 +46,6 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import {
   sendPhoneOtp,
-  submitStaffRegistrationRequest,
   verifyPhoneOtp,
 } from "@/lib/auth.functions";
 
@@ -202,14 +205,14 @@ export function Header() {
     void nav({ to: "/", search: role ? { role } : {} });
   };
   const executiveRoles = [
-    { role: "municipal_executive_officer", bn: "পৌর নির্বাহী কর্মকর্তা", en: "Pourashava Executive Officer (PEO)", Icon: Landmark },
-    { role: "uno", bn: "উপজেলা নির্বাহী অফিসার - UNO", en: "Upazila Nirbahi Officer - UNO", Icon: Building2 },
-    { role: "ddlg", bn: "উপপরিচালক, স্থানীয় সরকার - DDLG", en: "Deputy Director, Local Government - DDLG", Icon: MapPinned },
-    { role: "dc", bn: "জেলা প্রশাসক - DC", en: "District Commissioner - DC", Icon: MapPinned },
-    { role: "addl_registrar_general", bn: "অতিরিক্ত রেজিস্ট্রার জেনারেল", en: "Additional Registrar General", Icon: Award },
-    { role: "city_corporation_ceo", bn: "সিটি কর্পোরেশনের প্রধান নির্বাহী কর্মকর্তা", en: "City Corporation Chief Executive Officer - CEO", Icon: Building2 },
+    { role: "municipal_executive_officer", bn: "পৌর নির্বাহী কর্মকর্তা", en: "Municipal Executive Officer", Icon: Landmark },
+    { role: "uno", bn: "ইউএনও (UNO)", en: "Upazila Nirbahi Officer (UNO)", Icon: Building2 },
+    { role: "ddlg", bn: "ডিডিএলজি (DDLG)", en: "Deputy Director, Local Government (DDLG)", Icon: MapPinned },
+    { role: "dc", bn: "ডিসি (DC)", en: "District Commissioner (DC)", Icon: MapPinned },
+    { role: "addl_registrar_general", bn: "অতিরিক্ত রেজিস্টার জেনারেল", en: "Additional Registrar General", Icon: Award },
+    { role: "city_corporation_ceo", bn: "সিটি কর্পোরেশনের প্রধান নির্বাহী কর্মকর্তা", en: "CEO of City Corporation", Icon: Building2 },
     { role: "divisional_commissioner", bn: "বিভাগীয় কমিশনার", en: "Divisional Commissioner", Icon: ChartNoAxesCombined },
-    { role: "registrar_general", bn: "রেজিস্ট্রার জেনারেল", en: "Registrar General", Icon: ShieldCheck },
+    { role: "registrar_general", bn: "রেজিস্টার জেনারেল", en: "Registrar General", Icon: ShieldCheck },
   ] as const;
   const demoRoleForExecutive: Record<ExecutivePreviewRole, "admin" | "uno"> = {
     municipal_executive_officer: "admin",
@@ -275,7 +278,7 @@ export function Header() {
                   }`}
                 >
                   <ChartNoAxesCombined aria-hidden="true" className="h-4 w-4 shrink-0" />
-                  {L("উচ্চপর্যায়ের নির্বাহী প্যানেল", "Executive Panel")}
+                  {L("উচ্চ পর্যায়ের নির্বাহী প্যানেল", "Higher-Level Executive Panel")}
                   <ChevronDown
                     aria-hidden="true"
                     className={`h-4 w-4 transition-transform duration-200 ${isExecutiveMenuOpen ? "rotate-180" : ""}`}
@@ -285,7 +288,7 @@ export function Header() {
                   <div
                     id="executive-panel-menu"
                     role="menu"
-                    aria-label={L("উচ্চপর্যায়ের নির্বাহী প্যানেল", "Executive Panel")}
+                    aria-label={L("উচ্চ পর্যায়ের নির্বাহী প্যানেল", "Higher-Level Executive Panel")}
                     className="absolute left-0 top-full z-50 mt-2 w-72 rounded-xl border border-emerald-100 bg-white/95 p-2 text-slate-900 shadow-2xl backdrop-blur-md sm:left-auto sm:right-0"
                   >
                     <p className="px-3 py-2 text-xs font-semibold text-slate-500">
@@ -458,6 +461,7 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
   const { L, n, demoLoginAvailable, enterDemoLogin } = useApp();
   const nav = useNavigate();
   const sendOtp = useServerFn(sendPhoneOtp), verifyOtp = useServerFn(verifyPhoneOtp);
+<<<<<<< HEAD
   const submitRegistrationRequest = useServerFn(submitStaffRegistrationRequest);
   const [mobile, setMobile] = useState(""); const [otp, setOtp] = useState(""); const [sent, setSent] = useState(false);
   const [fullName, setFullName] = useState("");
@@ -465,6 +469,9 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
   const [requestRole, setRequestRole] = useState<"worker" | "police">("worker");
   const [requestUnion, setRequestUnion] = useState("");
   const [requestSubmitted, setRequestSubmitted] = useState(false);
+=======
+  const [mobile, setMobile] = useState(""); const [otp, setOtp] = useState(""); const [sent, setSent] = useState(false);
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
   const [loginMessage, setLoginMessage] = useState<"pending" | "rejected" | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -504,39 +511,64 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
     }
   };
 
-  useEffect(() => {
-    if (!open) {
-      setRequestSubmitted(false);
-      setFullName("");
-      setRequestMobile("");
-      setRequestUnion("");
-    }
-  }, [open]);
-
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-h-[90svh] w-[calc(100%-2rem)] max-w-4xl overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
-          <DialogTitle>{L("লগইন বা নিবন্ধনের অনুরোধ", "Login or request registration")}</DialogTitle>
-          <DialogDescription>{L("বিদ্যমান অ্যাকাউন্টে লগইন করুন অথবা কর্মী হিসেবে নিবন্ধনের অনুরোধ পাঠান", "Sign in to an existing account or request staff registration")}</DialogDescription>
+          <DialogTitle>
+            {L("লগইন বা নিবন্ধনের অনুরোধ", "Login or request registration")}
+          </DialogTitle>
+          <DialogDescription>
+            {L(
+              "বিদ্যমান অ্যাকাউন্টে লগইন করুন অথবা কর্মী হিসেবে নিবন্ধনের অনুরোধ পাঠান",
+              "Sign in to an existing account or request staff registration",
+            )}
+          </DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="login">
-          <TabsList className="grid h-auto w-full grid-cols-2">
-            <TabsTrigger value="login">{L("লগইন", "Login")}</TabsTrigger>
-            <TabsTrigger value="register">{L("নিবন্ধন", "Register")}</TabsTrigger>
+          <TabsList className="grid h-auto w-full grid-cols-2 rounded-xl border border-emerald-100 bg-emerald-50 p-1.5">
+            <TabsTrigger
+              className="h-12 text-lg font-bold text-emerald-900 data-[state=active]:bg-white data-[state=active]:text-emerald-800 data-[state=active]:shadow-md"
+              value="login"
+            >
+              {L("লগইন", "Login")}
+            </TabsTrigger>
+            <TabsTrigger
+              className="h-12 text-lg font-bold text-emerald-900 data-[state=active]:bg-white data-[state=active]:text-emerald-800 data-[state=active]:shadow-md"
+              value="register"
+            >
+              {L("নিবন্ধন", "Register")}
+            </TabsTrigger>
           </TabsList>
           {loginMessage && (
-            <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950" role="status" aria-live="polite">
+            <div
+              className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"
+              role="status"
+              aria-live="polite"
+            >
               {loginMessage === "pending"
-                ? L("Waiting for Approval — আপনার অ্যাকাউন্ট অনুমোদনের অপেক্ষায় আছে।", "Waiting for Approval — your account is awaiting review.")
+                ? L(
+                    "Waiting for Approval — আপনার অ্যাকাউন্ট অনুমোদনের অপেক্ষায় আছে।",
+                    "Waiting for Approval — your account is awaiting review.",
+                  )
                 : L("আপনার নিবন্ধন অনুমোদিত হয়নি।", "Your registration was not approved.")}
             </div>
           )}
           <TabsContent value="login" className="pt-2">
             <Tabs defaultValue="otp">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="otp">{L("মোবাইল ও OTP", "Mobile & OTP")}</TabsTrigger>
-                <TabsTrigger value="pw">{L("পাসওয়ার্ড", "Password")}</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 rounded-lg border border-emerald-100 bg-emerald-50 p-1">
+                <TabsTrigger
+                  className="text-base font-semibold text-emerald-900 data-[state=active]:bg-white data-[state=active]:text-emerald-800 data-[state=active]:shadow-sm"
+                  value="otp"
+                >
+                  {L("মোবাইল ও OTP", "Mobile & OTP")}
+                </TabsTrigger>
+                <TabsTrigger
+                  className="text-base font-semibold text-emerald-900 data-[state=active]:bg-white data-[state=active]:text-emerald-800 data-[state=active]:shadow-sm"
+                  value="pw"
+                >
+                  {L("পাসওয়ার্ড", "Password")}
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="otp" className="space-y-3 pt-2">
             <p className="text-xs text-muted-foreground">{L("স্বাস্থ্যকর্মী ও গ্রাম পুলিশের জন্য", "For Health Workers & Village Police")}</p>
@@ -546,10 +578,10 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
               </p>
             )}
             <Label>{L("মোবাইল নম্বর", "Mobile number")}</Label>
-            <Input inputMode="numeric" maxLength={11} value={mobile} disabled={sent} onChange={(e) => setMobile(e.target.value.replace(/\D/g, ""))} placeholder="017XXXXXXXX" />
+            <Input className="border-slate-300 bg-slate-50 shadow-sm focus-visible:ring-emerald-700" inputMode="numeric" maxLength={11} value={mobile} disabled={sent} onChange={(e) => setMobile(e.target.value.replace(/\D/g, ""))} placeholder="017XXXXXXXX" />
             {sent ? (<>
               <Label>{L("৬ অঙ্কের কোড", "6-digit code")}</Label>
-              <Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} />
+              <Input className="border-slate-300 bg-slate-50 shadow-sm focus-visible:ring-emerald-700" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} />
               <Button className="w-full" disabled={busy || otp.length !== 6} onClick={() => run(async () => {
                 const r = await verifyOtp({ data: { mobile, code: otp } }); if (r.ok) await done(r.tokens); else fail(r);
               })}>{L("যাচাই করুন", "Verify")}</Button>
@@ -583,6 +615,7 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
                 </div>
               )}
             </>}
+<<<<<<< HEAD
           </TabsContent>
           <TabsContent value="pw" className="pt-2">
             <>
@@ -594,111 +627,21 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
               />
             </>
           </TabsContent>
+=======
+              </TabsContent>
+              <TabsContent value="pw" className="space-y-3 pt-2">
+                <p className="text-xs text-muted-foreground">{L("অনুমোদিত কর্মীরা ইমেইল ও পাসওয়ার্ড দিয়ে লগইন করুন", "Approved staff can sign in with email and password")}</p>
+                <PasswordLoginForm
+                  onAuthenticated={done}
+                  onFailure={fail}
+                  onStart={() => setLoginMessage(null)}
+                />
+              </TabsContent>
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
             </Tabs>
           </TabsContent>
           <TabsContent value="register" className="space-y-3 pt-2">
-            {requestSubmitted ? (
-              <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-950" role="status" aria-live="polite">
-                {L(
-                  "আপনার অনুরোধ জমা হয়েছে। সংশ্লিষ্ট কর্মকর্তা অ্যাকাউন্ট তৈরি করলে মোবাইল OTP দিয়ে লগইন করতে পারবেন।",
-                  "Your request was submitted. You can sign in with mobile OTP after the responsible officer creates your account.",
-                )}
-              </div>
-            ) : (
-              <>
-                <p className="text-xs text-muted-foreground">
-                  {L(
-                    "স্বাস্থ্যকর্মী বা গ্রাম পুলিশ হিসেবে আবেদন করুন। এটি শুধু অনুরোধ—এখনই কোনো অ্যাকাউন্ট বা পাসওয়ার্ড তৈরি হবে না।",
-                    "Request access as a Health Worker or Gram Police. This is only a request; no account or password is created yet.",
-                  )}
-                </p>
-                <div className="space-y-1">
-                  <Label htmlFor="registration-full-name">{L("পূর্ণ নাম", "Full name")}</Label>
-                  <Input
-                    id="registration-full-name"
-                    autoComplete="name"
-                    maxLength={100}
-                    value={fullName}
-                    onChange={(event) => setFullName(event.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="registration-mobile">{L("মোবাইল নম্বর", "Mobile number")}</Label>
-                  <Input
-                    id="registration-mobile"
-                    type="tel"
-                    inputMode="numeric"
-                    autoComplete="tel"
-                    maxLength={11}
-                    placeholder="01XXXXXXXXX"
-                    value={requestMobile}
-                    onChange={(event) => setRequestMobile(event.target.value.replace(/\D/g, ""))}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>{L("যে ভূমিকার জন্য আবেদন", "Role requested")}</Label>
-                  <Select value={requestRole} onValueChange={(value) => {
-                    if (value === "worker" || value === "police") setRequestRole(value);
-                  }}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="worker">{L("স্বাস্থ্যকর্মী", "Health Worker")}</SelectItem>
-                      <SelectItem value="police">{L("গ্রাম পুলিশ", "Gram Police")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label>{L("ইউনিয়ন", "Union")}</Label>
-                  <Select value={requestUnion} onValueChange={setRequestUnion}>
-                    <SelectTrigger><SelectValue placeholder={L("ইউনিয়ন বেছে নিন", "Select your union")} /></SelectTrigger>
-                    <SelectContent>
-                      {MONIRAMPUR_STATIONS.filter((station) => station.type === "union").map((station) => (
-                        <SelectItem key={station.id} value={station.id}>{L(station.bn, station.en)}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  className="w-full"
-                  disabled={busy || !fullName.trim() || requestMobile.length !== 11 || !requestUnion}
-                  onClick={() => void run(async () => {
-                    let result: Awaited<ReturnType<typeof submitRegistrationRequest>>;
-                    try {
-                      result = await submitRegistrationRequest({
-                        data: { fullName: fullName.trim(), mobile: requestMobile, role: requestRole, unionId: requestUnion },
-                      });
-                    } catch (err) {
-                      console.error("Full Supabase Error:", JSON.stringify(err, null, 2));
-                      alert(L("অনুরোধ জমা দেওয়া যায়নি। পরে আবার চেষ্টা করুন", "Could not submit the request. Please try again later"));
-                      return;
-                    }
-                    if (!result.ok) {
-                      toast.error(
-                        result.error === "unavailable" && result.debugMessage
-                          ? result.debugMessage
-                          : result.error === "bad_phone"
-                          ? L("সঠিক মোবাইল নম্বর দিন", "Enter a valid mobile number")
-                          : result.error === "bad_union"
-                            ? L("সঠিক ইউনিয়ন বেছে নিন", "Select a valid union")
-                            : result.error === "duplicate"
-                              ? L("এই নম্বরের একটি অনুরোধ ইতিমধ্যে অপেক্ষমাণ", "A request for this number is already pending")
-                              : result.error === "too_many"
-                                ? L("অনেকবার অনুরোধ করা হয়েছে। পরে আবার চেষ্টা করুন", "Too many requests. Please try again later")
-                                : L("অনুরোধ জমা দেওয়া যায়নি। পরে আবার চেষ্টা করুন", "Could not submit the request. Please try again later"),
-                      );
-                      return;
-                    }
-                    setRequestSubmitted(true);
-                    setFullName("");
-                    setRequestMobile("");
-                    setRequestUnion("");
-                    toast.success(L("নিবন্ধনের অনুরোধ জমা হয়েছে", "Registration request submitted"));
-                  })}
-                >
-                  {busy ? L("জমা হচ্ছে…", "Submitting…") : L("নিবন্ধনের অনুরোধ পাঠান", "Submit registration request")}
-                </Button>
-              </>
-            )}
+            <Register />
           </TabsContent>
         </Tabs>
         {demoLoginAvailable && (

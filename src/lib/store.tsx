@@ -372,6 +372,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           id: p.id,
           name: { bn: p.name_bn, en: p.name_en },
           role: role ?? "worker",
+<<<<<<< HEAD
+=======
+          active: p.active,
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
           mobile: p.mobile ?? undefined,
           email: p.email ?? undefined,
           upazilaId: p.upazila_id ?? "",
@@ -1059,7 +1063,13 @@ export function scopedCases(state: AppState, u: User | null) {
     const caseStationId = c.stationId ?? c.unionId;
     if (!assignedStationId || caseStationId !== assignedStationId || c.unionId !== u.unionId) return false;
     if (u.role === "admin") return true;
-    if (u.role === "police") return c.ward === u.ward && (c.createdBy === u.id || !!c.police);
+    if (u.role === "police") {
+      return c.ward === u.ward && (
+        c.createdBy === u.id ||
+        c.police?.assignedPoliceId === u.id ||
+        (!!c.police && !c.police.assignedPoliceId)
+      );
+    }
     return c.createdBy === u.id;
   });
 }

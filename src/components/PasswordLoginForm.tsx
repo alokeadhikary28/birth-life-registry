@@ -8,6 +8,11 @@ import { Label } from "@/components/ui/label";
 import { passwordSignIn, requestPasswordReset } from "@/lib/auth.functions";
 import { useApp } from "@/lib/store";
 
+<<<<<<< HEAD
+=======
+const fieldClassName = "border-slate-300 bg-slate-50 shadow-sm focus-visible:ring-emerald-700";
+
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
 type LoginFailure = { error?: string; lockedMinutes?: number };
 type Tokens = { access_token: string; refresh_token: string };
 
@@ -91,8 +96,14 @@ export function PasswordLoginForm({
       </div>
 
       <div className="space-y-1.5">
+<<<<<<< HEAD
         <Label htmlFor="password-login-email">{L("ইউজারনেম / ইমেইল", "Username / Email")}</Label>
         <Input
+=======
+        <Label htmlFor="password-login-email">{L("ইমেইল (লগইন আইডি)", "Email (login ID)")}</Label>
+        <Input
+          className={fieldClassName}
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
           id="password-login-email"
           type="email"
           autoComplete="username"
@@ -111,7 +122,11 @@ export function PasswordLoginForm({
             id="password-login-password"
             type={showPassword ? "text" : "password"}
             autoComplete="current-password"
+<<<<<<< HEAD
             className="pr-11"
+=======
+            className={`${fieldClassName} pr-11`}
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             required

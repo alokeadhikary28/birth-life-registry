@@ -337,13 +337,34 @@ export type Database = {
       }
       staff_registration_requests: {
         Row: {
+          category:
+            | "স্বাস্থ্যকর্মী"
+            | "গ্রাম পুলিশ"
+            | "ইউপি প্রশাসনিক কর্মকর্তা"
+            | "উচ্চ পর্যায়ের নির্বাহী প্যানেল"
           created_at: string
+          email: string | null
           full_name: string
           id: string
-          phone: string
+          office_name: string | null
+          phone: string | null
           processing_at: string | null
           processing_by: string | null
+<<<<<<< HEAD
           role: "worker" | "police"
+=======
+          requested_position:
+            | "municipal_executive_officer"
+            | "uno"
+            | "ddlg"
+            | "dc"
+            | "addl_registrar_general"
+            | "city_corporation_ceo"
+            | "divisional_commissioner"
+            | "registrar_general"
+            | null
+          role: "worker" | "police" | "admin" | "uno" | "district" | "super"
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
           reviewed_at: string | null
           reviewed_by: string | null
           status: "pending" | "processing" | "provisioned" | "approved" | "rejected"
@@ -351,13 +372,34 @@ export type Database = {
           upazila_id: string
         }
         Insert: {
+          category:
+            | "স্বাস্থ্যকর্মী"
+            | "গ্রাম পুলিশ"
+            | "ইউপি প্রশাসনিক কর্মকর্তা"
+            | "উচ্চ পর্যায়ের নির্বাহী প্যানেল"
           created_at?: string
+          email?: string | null
           full_name: string
           id?: string
-          phone: string
+          office_name?: string | null
+          phone?: string | null
           processing_at?: string | null
           processing_by?: string | null
+<<<<<<< HEAD
           role: "worker" | "police"
+=======
+          requested_position?:
+            | "municipal_executive_officer"
+            | "uno"
+            | "ddlg"
+            | "dc"
+            | "addl_registrar_general"
+            | "city_corporation_ceo"
+            | "divisional_commissioner"
+            | "registrar_general"
+            | null
+          role: "worker" | "police" | "admin" | "uno" | "district" | "super"
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: "pending" | "processing" | "provisioned" | "approved" | "rejected"
@@ -365,13 +407,34 @@ export type Database = {
           upazila_id: string
         }
         Update: {
+          category?:
+            | "স্বাস্থ্যকর্মী"
+            | "গ্রাম পুলিশ"
+            | "ইউপি প্রশাসনিক কর্মকর্তা"
+            | "উচ্চ পর্যায়ের নির্বাহী প্যানেল"
           created_at?: string
+          email?: string | null
           full_name?: string
           id?: string
-          phone?: string
+          office_name?: string | null
+          phone?: string | null
           processing_at?: string | null
           processing_by?: string | null
+<<<<<<< HEAD
           role?: "worker" | "police"
+=======
+          requested_position?:
+            | "municipal_executive_officer"
+            | "uno"
+            | "ddlg"
+            | "dc"
+            | "addl_registrar_general"
+            | "city_corporation_ceo"
+            | "divisional_commissioner"
+            | "registrar_general"
+            | null
+          role?: "worker" | "police" | "admin" | "uno" | "district" | "super"
+>>>>>>> 6993c5b3469384e6e35d38e68fe541f4e440eaa9
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: "pending" | "processing" | "provisioned" | "approved" | "rejected"

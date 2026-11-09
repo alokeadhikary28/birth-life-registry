@@ -346,6 +346,8 @@ export type Database = {
           email: string | null
           full_name: string
           id: string
+          admin_area: string
+          mobile: string | null
           office_name: string | null
           phone: string | null
           processing_at: string | null
@@ -377,6 +379,8 @@ export type Database = {
           email?: string | null
           full_name: string
           id?: string
+          admin_area: string
+          mobile?: string | null
           office_name?: string | null
           phone?: string | null
           processing_at?: string | null
@@ -408,6 +412,8 @@ export type Database = {
           email?: string | null
           full_name?: string
           id?: string
+          admin_area?: string
+          mobile?: string | null
           office_name?: string | null
           phone?: string | null
           processing_at?: string | null

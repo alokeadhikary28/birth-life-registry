@@ -70,15 +70,49 @@ export default function Register() {
 
   const submit = async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     setLoading(true);
     setMessage(null);
 
     try {
+      const mobileDigits = formData.mobile.replace(/\D/g, "");
+      const validRole = [
+        "স্বাস্থ্যকর্মী",
+        "গ্রাম পুলিশ",
+        "ইউপি প্রশাসনিক কর্মকর্তা",
+        EXECUTIVE_CATEGORY,
+      ].includes(formData.category);
+      if (
+        !formData.fullName.trim() ||
+        !formData.email.trim() ||
+        !mobileDigits ||
+        !formData.officeName.trim() ||
+        !validRole ||
+        !formData.jurisdictionId ||
+        (formData.category === EXECUTIVE_CATEGORY && !formData.requestedPosition)
+      ) {
+        setMessage({
+          type: "error",
+          text: L(
+            "সব প্রয়োজনীয় তথ্য পূরণ করে ভূমিকা ও প্রশাসনিক এলাকা বেছে নিন।",
+            "Complete all required fields and select a role and administrative area.",
+          ),
+        });
+        return;
+      }
+      if (!/^(\+?88)?01\d{9}$/.test(formData.mobile.replace(/[\s-]/g, ""))) {
+        setMessage({
+          type: "error",
+          text: L("সঠিক মোবাইল নম্বর দিন (01XXXXXXXXX)", "Enter a valid mobile number (01XXXXXXXXX)"),
+        });
+        return;
+      }
+
       const result = await submitRequest({
         data: {
           fullName: formData.fullName.trim(),
           email: formData.email.trim(),
-          mobile: formData.mobile.trim() || undefined,
+          mobile: formData.mobile.trim(),
           officeName: formData.officeName.trim(),
           category: formData.category,
           requestedPosition: formData.requestedPosition || undefined,
@@ -95,8 +129,8 @@ export default function Register() {
               ? L("সঠিক এলাকা বেছে নিন", "Select a valid jurisdiction")
               : result.error === "duplicate"
                 ? L(
-                    "এই ইমেইল দিয়ে একটি অনুরোধ ইতিমধ্যে জমা হয়েছে",
-                    "A request with this email has already been submitted",
+                    "এই ইমেইল বা মোবাইল নম্বর দিয়ে একটি অনুরোধ আগেই জমা হয়েছে",
+                    "A request with this email or mobile number has already been submitted",
                   )
                 : result.error === "too_many"
                   ? L(
@@ -112,6 +146,7 @@ export default function Register() {
       }
 
       setFormData(initialForm);
+      form.reset();
       setMessage({
         type: "success",
         text: L(
@@ -181,7 +216,7 @@ export default function Register() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label className="text-lg" htmlFor="registration-mobile">
-            {L("মোবাইল নম্বর (ঐচ্ছিক)", "Mobile number (optional)")}
+            {L("মোবাইল নম্বর", "Mobile number")}
           </Label>
           <Input
             className={`h-11 text-lg md:text-lg ${fieldClassName}`}
@@ -193,6 +228,7 @@ export default function Register() {
             placeholder="017XXXXXXXX"
             value={formData.mobile}
             onChange={(event) => updateField("mobile", event.target.value)}
+            required
             disabled={loading}
           />
         </div>
@@ -234,6 +270,7 @@ export default function Register() {
             <SelectTrigger
               className={`h-11 text-lg ${fieldClassName}`}
               id="registration-category"
+              aria-required="true"
             >
               <SelectValue />
             </SelectTrigger>
@@ -294,6 +331,7 @@ export default function Register() {
           <SelectTrigger
             className={`h-11 text-lg ${fieldClassName}`}
             id="registration-jurisdiction"
+            aria-required="true"
           >
             <SelectValue placeholder={L("এলাকা বেছে নিন", "Select jurisdiction")} />
           </SelectTrigger>
@@ -338,6 +376,7 @@ export default function Register() {
           loading ||
           !formData.fullName.trim() ||
           !formData.email.trim() ||
+          !formData.mobile.trim() ||
           !formData.jurisdictionId ||
           !formData.officeName.trim() ||
           (formData.category === EXECUTIVE_CATEGORY && !formData.requestedPosition)

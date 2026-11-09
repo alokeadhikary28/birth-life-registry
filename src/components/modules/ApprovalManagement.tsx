@@ -14,8 +14,8 @@ import {
 import { EXECUTIVE_POSITIONS, type ExecutivePreviewRole } from "@/lib/dashboard-roles";
 import { useApp } from "@/lib/store";
 
-type FieldStaffRole = "worker" | "police";
-type StaffRole = FieldStaffRole | "admin" | "uno" | "district" | "super";
+type ApplicantRole = "worker" | "police" | "admin";
+type StaffRole = ApplicantRole | "uno" | "district" | "super";
 type RegistrationCategory =
   "স্বাস্থ্যকর্মী" | "গ্রাম পুলিশ" | "ইউপি প্রশাসনিক কর্মকর্তা" | "উচ্চ পর্যায়ের নির্বাহী প্যানেল";
 
@@ -25,7 +25,7 @@ type Applicant = {
   nameEn: string;
   email: string | null;
   mobile: string | null;
-  role: FieldStaffRole;
+  role: ApplicantRole;
   createdAt: string;
 };
 
@@ -38,6 +38,7 @@ type RegistrationRequest = {
   category: RegistrationCategory;
   requestedPosition: ExecutivePreviewRole | null;
   officeName: string | null;
+  adminArea: string;
   upazilaId: string;
   unionId: string;
   unionName: string;
@@ -84,7 +85,9 @@ export function ApprovalManagement() {
         setApplicants(
           result.applicants.filter(
             (applicant): applicant is Applicant =>
-              applicant.role === "worker" || applicant.role === "police",
+              applicant.role === "worker" ||
+              applicant.role === "police" ||
+              applicant.role === "admin",
           ),
         );
         setRequests(
@@ -299,51 +302,72 @@ export function ApprovalManagement() {
         </div>
       ) : (
         <div className="space-y-3">
-          {requests.map((request) => (
-            <article
-              key={request.id}
-              className="flex flex-col gap-4 rounded-xl border border-emerald-200 bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="min-w-0">
-                <h2 className="font-semibold">{request.fullName}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {request.category}
-                  {request.requestedPosition && (
-                    <>
-                      {" · "}
-                      {EXECUTIVE_POSITIONS.find(
-                        (position) => position.role === request.requestedPosition,
-                      )?.bn ?? request.requestedPosition}
-                    </>
-                  )}
-                  {" · "}
-                  {roleName(request.role, L)} · {request.unionName}
-                </p>
-                {request.officeName && (
-                  <p className="text-sm text-muted-foreground">{request.officeName}</p>
-                )}
-                <p className="break-all text-sm">{request.email ?? request.mobile}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {L("আবেদনের তারিখ", "Submitted")} ·{" "}
-                  {new Date(request.createdAt).toLocaleDateString(L("bn-BD", "en-US"))}
-                </p>
-              </div>
-              <div className="flex shrink-0 gap-2">
-                <Button disabled={busyId !== null} onClick={() => void approveRequest(request)}>
-                  <Check className="mr-1 h-4 w-4" />
-                  {L("অনুমোদন ও সক্রিয় করুন", "Approve & activate")}
-                </Button>
-                <Button
-                  variant="destructive"
-                  disabled={busyId !== null}
-                  onClick={() => void dismissRequest(request)}
-                >
-                  <X className="mr-1 h-4 w-4" />
-                  {L("প্রত্যাখ্যান", "Reject")}
-                </Button>
-              </div>
-            </article>
-          ))}
+          {requests.length > 0 && (
+            <div className="overflow-x-auto rounded-xl border border-border bg-card">
+              <table className="w-full min-w-[980px] text-left text-sm">
+                <thead className="bg-muted/60 text-muted-foreground">
+                  <tr>
+                    <th scope="col" className="px-4 py-3 font-semibold">{L("নাম", "Name")}</th>
+                    <th scope="col" className="px-4 py-3 font-semibold">{L("ভূমিকা / অফিস", "Role / office")}</th>
+                    <th scope="col" className="px-4 py-3 font-semibold">{L("ইমেইল", "Email")}</th>
+                    <th scope="col" className="px-4 py-3 font-semibold">{L("মোবাইল", "Mobile")}</th>
+                    <th scope="col" className="px-4 py-3 font-semibold">{L("প্রশাসনিক এলাকা", "Administrative area")}</th>
+                    <th scope="col" className="px-4 py-3 font-semibold">{L("আবেদনের তারিখ", "Submitted")}</th>
+                    <th scope="col" className="px-4 py-3 font-semibold">{L("অ্যাকশন", "Actions")}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {requests.map((request) => (
+                    <tr key={request.id}>
+                      <td className="px-4 py-3 font-medium">{request.fullName}</td>
+                      <td className="px-4 py-3">
+                        <div>{roleName(request.role, L)}</div>
+                        {request.officeName && (
+                          <div className="text-xs text-muted-foreground">{request.officeName}</div>
+                        )}
+                        {request.requestedPosition && (
+                          <div className="text-xs text-muted-foreground">
+                            {EXECUTIVE_POSITIONS.find(
+                              (position) => position.role === request.requestedPosition,
+                            )?.bn ?? request.requestedPosition}
+                          </div>
+                        )}
+                      </td>
+                      <td className="break-all px-4 py-3">
+                        {request.email ?? L("দেওয়া হয়নি", "Not provided")}
+                      </td>
+                      <td className="px-4 py-3">
+                        {request.mobile ?? L("দেওয়া হয়নি", "Not provided")}
+                      </td>
+                      <td className="px-4 py-3">{request.adminArea || request.unionName}</td>
+                      <td className="px-4 py-3">
+                        {new Date(request.createdAt).toLocaleDateString(L("bn-BD", "en-US"))}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2">
+                          <Button
+                            disabled={busyId !== null}
+                            onClick={() => void approveRequest(request)}
+                          >
+                            <Check className="mr-1 h-4 w-4" />
+                            {L("অনুমোদন", "Approve")}
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            disabled={busyId !== null}
+                            onClick={() => void dismissRequest(request)}
+                          >
+                            <X className="mr-1 h-4 w-4" />
+                            {L("বাতিল", "Reject")}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           {applicants.map((applicant) => (
             <article
               key={applicant.id}
@@ -355,7 +379,12 @@ export function ApprovalManagement() {
                   <p className="text-sm text-muted-foreground">{applicant.nameBn}</p>
                 )}
                 <p className="text-sm text-muted-foreground">{roleName(applicant.role, L)}</p>
-                <p className="break-all text-sm">{applicant.email ?? applicant.mobile}</p>
+                <p className="break-all text-sm">
+                  {L("ইমেইল", "Email")}: {applicant.email ?? L("দেওয়া হয়নি", "Not provided")}
+                </p>
+                <p className="break-all text-sm">
+                  {L("মোবাইল", "Mobile")}: {applicant.mobile ?? L("দেওয়া হয়নি", "Not provided")}
+                </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {L("আবেদনের তারিখ", "Submitted")} ·{" "}
                   {new Date(applicant.createdAt).toLocaleDateString(L("bn-BD", "en-US"))}

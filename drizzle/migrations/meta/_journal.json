@@ -281,6 +281,20 @@
       "when": 1794000300000,
       "tag": "0039_registration_executive_positions",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1794237070525,
+      "tag": "0041_staff_registration_mobile_admin_area",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1794238642499,
+      "tag": "0042_staff_registration_mobile_unique",
+      "breakpoints": true
     }
   ]
 }

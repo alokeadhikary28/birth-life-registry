@@ -104,7 +104,7 @@ export const listPendingStaff = createServerFn({ method: "GET" })
     profiles = pendingProfiles ?? [];
 
     const { data: registrationRequests, error: requestsError } = await db.from("staff_registration_requests")
-      .select("id, full_name, email, phone, role, union_name, upazila_id, office_name, category, requested_position, created_at")
+      .select("id, full_name, email, phone, mobile, admin_area, role, union_name, upazila_id, office_name, category, requested_position, created_at")
       .eq("status", "pending")
       .order("created_at", { ascending: true });
     if (requestsError) {
@@ -133,7 +133,7 @@ export const listPendingStaff = createServerFn({ method: "GET" })
       );
       applicants = profiles.flatMap((profile) => {
         const role = roleByUserId.get(profile.id);
-        if (role !== "worker" && role !== "police") return [];
+        if (role !== "worker" && role !== "police" && role !== "admin") return [];
         return [{
           id: profile.id,
           nameBn: profile.name_bn,
@@ -156,10 +156,11 @@ export const listPendingStaff = createServerFn({ method: "GET" })
           id: request.id,
           fullName: request.full_name,
           email: request.email,
-          mobile: request.phone,
+          mobile: request.mobile ?? request.phone,
           role: request.role,
           category: request.category,
           officeName: request.office_name,
+          adminArea: request.admin_area,
           requestedPosition: request.requested_position,
           upazilaId: request.upazila_id,
           unionId: requestStation?.id ?? "",
@@ -200,7 +201,9 @@ export const reviewStaffRegistration = createServerFn({ method: "POST" })
     }
     const applicantRoles = (applicantRoleRows ?? []).map((item) => item.role);
     const canReviewRole = applicantRoles.length === 1 &&
-      (applicantRoles[0] === "worker" || applicantRoles[0] === "police");
+      (applicantRoles[0] === "worker" ||
+        applicantRoles[0] === "police" ||
+        applicantRoles[0] === "admin");
     if (!canReviewRole) return { ok: false as const, error: "not_pending_or_forbidden" };
 
     const status = data.decision === "approve" ? "active" : "rejected";
@@ -237,7 +240,7 @@ export const submitStaffRegistrationRequest = createServerFn({ method: "POST" })
   .validator((d) => z.object({
     fullName: z.string().trim().min(1).max(100),
     email: z.string().trim().toLowerCase().email().max(255),
-    mobile: z.string().trim().max(20).optional(),
+    mobile: z.string().trim().min(1).max(20),
     officeName: z.string().trim().min(1).max(120),
     category: z.enum([
       "স্বাস্থ্যকর্মী",
@@ -271,7 +274,7 @@ export const submitStaffRegistrationRequest = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data }) => {
     const email = data.email.trim().toLowerCase();
-    const mobile = data.mobile ? normalizePhone(data.mobile) : null;
+    const mobile = normalizePhone(data.mobile);
     const roleByCategory = {
       "স্বাস্থ্যকর্মী": "worker",
       "গ্রাম পুলিশ": "police",
@@ -283,7 +286,7 @@ export const submitStaffRegistrationRequest = createServerFn({ method: "POST" })
         : null
       : roleByCategory[data.category];
     if (!role) return { ok: false as const, error: "bad_category" };
-    if (data.mobile && !mobile) return { ok: false as const, error: "bad_phone" };
+    if (!mobile) return { ok: false as const, error: "bad_phone" };
 
     const ip = clientIp();
     const identifier = `staff-registration:${await sha256(ip)}`;
@@ -318,14 +321,46 @@ export const submitStaffRegistrationRequest = createServerFn({ method: "POST" })
         await logAttempt(identifier, "staff_registration_request", ip, false, "invalid_union");
         return { ok: false as const, error: "bad_union" };
       }
+
+      const { data: emailMatch, error: emailLookupError } = await db
+        .from("staff_registration_requests")
+        .select("id")
+        .eq("email", email)
+        .limit(1)
+        .maybeSingle();
+      if (emailLookupError) {
+        console.error("Could not check duplicate staff registration email", emailLookupError.message);
+        await logAttempt(identifier, "staff_registration_request", ip, false, "duplicate_check");
+        return { ok: false as const, error: "unavailable" };
+      }
+
+      const { data: mobileMatch, error: mobileLookupError } = await db
+        .from("staff_registration_requests")
+        .select("id")
+        .eq("mobile", mobile)
+        .limit(1)
+        .maybeSingle();
+      if (mobileLookupError) {
+        console.error("Could not check duplicate staff registration mobile", mobileLookupError.message);
+        await logAttempt(identifier, "staff_registration_request", ip, false, "duplicate_check");
+        return { ok: false as const, error: "unavailable" };
+      }
+
+      if (emailMatch || mobileMatch) {
+        await logAttempt(identifier, "staff_registration_request", ip, false, "duplicate");
+        return { ok: false as const, error: "duplicate" };
+      }
+
       const { error } = await db.from("staff_registration_requests").insert({
         full_name: data.fullName,
         email,
+        mobile,
         phone: mobile,
         office_name: data.officeName,
         category: data.category,
         requested_position: data.requestedPosition ?? null,
         role,
+        admin_area: selectedUnion.en,
         union_name: selectedUnion.en,
         upazila_id: "manirampur",
         status: "pending",

@@ -2193,7 +2193,7 @@ export function RegistrationDashboard({
         </div>
       ) : (
         <div className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col gap-1 px-4 py-1 max-[360px]:gap-1 max-[360px]:py-1 sm:gap-1.5 sm:px-6 sm:py-1.5 lg:px-8">
-          <div className="grid min-h-0 flex-1 -ml-4 grid-cols-1 auto-rows-max gap-3 sm:-ml-6 lg:-ml-8 lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-stretch lg:gap-4">
+          <div className="grid min-h-0 flex-1 -ml-4 grid-cols-1 auto-rows-max gap-3 sm:-ml-6 lg:-ml-8 lg:grid-cols-[25rem_minmax(0,1fr)] lg:items-stretch lg:gap-4">
             <div className="flex min-h-max flex-col justify-start gap-3 rounded-r-2xl bg-slate-800 p-4 shadow-lg lg:gap-3">
               <QuickAccessPanel
                 actions={quickAccessActions}

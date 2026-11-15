@@ -305,7 +305,7 @@ export function MonthlyProgressCard({
       <section
         className={`flex w-full flex-col rounded-2xl border border-slate-200/60 bg-white shadow-sm ${
           featured
-            ? "gap-3 p-4 sm:min-h-[22rem] sm:gap-4 sm:p-5 xl:min-h-[24rem] xl:p-6"
+            ? "gap-3 p-4 sm:min-h-[25rem] sm:gap-4 sm:p-5 xl:min-h-[27rem] xl:p-6"
             : compact
               ? "min-h-[17rem] gap-1.5 p-2.5 sm:min-h-[18rem] sm:gap-2 sm:p-3"
               : "min-h-[24rem] p-5 sm:min-h-[25rem] sm:p-6"
@@ -317,7 +317,7 @@ export function MonthlyProgressCard({
           compact
             ? "gap-1.5 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] sm:gap-2"
             : featured
-              ? "gap-3 sm:grid-cols-[minmax(12rem,0.9fr)_minmax(0,1.1fr)] sm:gap-4 xl:gap-6"
+              ? "gap-3 sm:grid-cols-[minmax(17rem,0.9fr)_minmax(0,1.1fr)] sm:gap-4 xl:gap-6"
               : "gap-5 sm:grid-cols-[minmax(14rem,0.9fr)_minmax(0,1.1fr)] sm:gap-6"
         }`}
       >
@@ -338,7 +338,7 @@ export function MonthlyProgressCard({
             onClick={() => setSelectedReport("overall")}
             className={`group relative mx-auto shrink-0 transform cursor-pointer rounded-full shadow-md transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:shadow-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 ${
               featured
-                ? "h-44 w-44 sm:h-56 sm:w-56 xl:h-64 xl:w-64"
+                ? "h-52 w-52 sm:h-[17rem] sm:w-[17rem] xl:h-[19rem] xl:w-[19rem]"
                 : compact
                   ? "h-44 w-44 sm:h-52 sm:w-52"
                   : "h-52 w-52 sm:h-56 sm:w-56"
@@ -403,10 +403,10 @@ export function MonthlyProgressCard({
             </span>
           </button>
         </div>
-        <div className="flex min-w-0 flex-col gap-2">
+        <div className={`flex min-w-0 flex-col ${featured ? "gap-3 sm:gap-4" : "gap-2"}`}>
           <p
             className={`monthly-remaining-pulse flex w-full items-center justify-center text-center font-extrabold text-emerald-700 ${
-              compact ? "text-sm sm:text-lg" : "text-lg sm:text-xl"
+            compact ? "text-sm sm:text-lg" : featured ? "text-xl sm:text-2xl" : "text-lg sm:text-xl"
             }`}
           >
             {L(
@@ -417,7 +417,7 @@ export function MonthlyProgressCard({
           <div
           className={`grid w-full font-bold text-slate-700 ${
             featured
-              ? "gap-2 text-sm sm:gap-2.5 sm:text-base"
+              ? "gap-2.5 text-sm sm:gap-3 sm:text-base"
               : compact
                 ? "gap-1.5 text-xs"
                 : "gap-3 text-sm sm:text-base"
@@ -431,9 +431,9 @@ export function MonthlyProgressCard({
               aria-label={L(`${item.label} বিস্তারিত প্রতিবেদন দেখুন`, `View detailed ${item.label} report`)}
               className={`flex min-w-0 cursor-pointer items-center justify-between rounded-xl border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 ${
                 featured && item.details.length > 0
-                  ? "gap-3 p-3.5 sm:gap-4 sm:p-5"
+                  ? "gap-3 p-4 sm:gap-4 sm:p-6"
                   : featured
-                    ? "gap-3 p-3 sm:gap-4 sm:p-4"
+                    ? "gap-3 p-4 sm:gap-4 sm:p-5"
                     : compact
                       ? "gap-2 p-2"
                       : "gap-3 p-3"
@@ -454,7 +454,7 @@ export function MonthlyProgressCard({
               <span className={`shrink-0 text-right ${item.text}`}>
                 <span
                   className={`block font-extrabold ${
-                    featured ? "text-lg sm:text-xl" : compact ? "text-sm" : "text-base sm:text-lg"
+                    featured ? "text-xl sm:text-2xl" : compact ? "text-sm" : "text-base sm:text-lg"
                   }`}
                 >
                   {countsAvailable ? n(item.value) : "—"}
@@ -470,7 +470,7 @@ export function MonthlyProgressCard({
                         key={detail}
                         className={`rounded-md border border-emerald-200/80 bg-white/80 font-semibold text-emerald-900 ${
                           featured
-                            ? "px-2 py-1 text-[10px] leading-tight sm:text-xs"
+                            ? "px-2.5 py-1.5 text-xs leading-tight sm:px-3 sm:py-2 sm:text-sm"
                             : compact
                               ? "px-1 py-0.5 text-[9px] leading-tight sm:text-[10px]"
                               : "px-2 py-1 text-xs sm:text-sm"
@@ -490,7 +490,7 @@ export function MonthlyProgressCard({
       <div
         className={`flex w-full flex-wrap justify-between border-t border-emerald-100 font-semibold text-slate-600 ${
           featured
-            ? "gap-x-3 gap-y-1.5 px-1 pt-2 text-xs sm:pt-3 sm:text-sm"
+            ? "gap-x-3 gap-y-1.5 px-1 pt-3 text-sm sm:pt-4 sm:text-base"
             : compact
               ? "gap-x-2 gap-y-1 px-1 pt-2 text-[11px]"
               : "mt-4 gap-x-4 gap-y-2 px-2 pt-3 text-sm sm:text-base"

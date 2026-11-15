@@ -1449,6 +1449,17 @@ export function RegistrationDashboard({
     (user?.role === "admin" || user?.role === "worker" || user?.role === "police");
   const caseDataAvailable =
     !caseLoadError && (demoMode || Boolean(user) || import.meta.env.DEV);
+  const pendingQuickAccessCounts = useMemo(
+    () => ({
+      "birth-list": filteredCases.filter(
+        (item) => item.type === "birth" && item.status === "pending",
+      ).length,
+      "death-list": filteredCases.filter(
+        (item) => item.type === "death" && item.status === "pending",
+      ).length,
+    }),
+    [filteredCases],
+  );
   const monthlyCounts: MonthlyProgressCounts = usesStationMetrics
     ? (stationMonthlyMetrics?.counts ?? {
         birth: { pending: 0, progress: 0, completed: 0, total: 0 },
@@ -2182,12 +2193,15 @@ export function RegistrationDashboard({
         </div>
       ) : (
         <div className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col gap-1 px-4 py-1 max-[360px]:gap-1 max-[360px]:py-1 sm:gap-1.5 sm:px-6 sm:py-1.5 lg:px-8">
-          <div className="grid min-h-0 flex-1 -ml-4 grid-cols-1 auto-rows-max gap-3 sm:-ml-6 lg:-ml-8 lg:grid-cols-[23rem_minmax(0,1fr)] lg:items-stretch lg:gap-4">
+          <div className="grid min-h-0 flex-1 -ml-4 grid-cols-1 auto-rows-max gap-3 sm:-ml-6 lg:-ml-8 lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-stretch lg:gap-4">
             <div className="flex min-h-max flex-col justify-start gap-3 rounded-r-2xl bg-slate-800 p-4 shadow-lg lg:gap-3">
               <QuickAccessPanel
                 actions={quickAccessActions}
                 title={L("দ্রুত প্রবেশ", "Quick actions")}
                 publicDashboard={roleConfig === "public" || isExecutiveQuickAccess}
+                pendingCounts={pendingQuickAccessCounts}
+                pendingCountsAvailable={caseDataAvailable}
+                pendingLabel={L("যাচাই অপেক্ষমাণ", "Pending review")}
                 onActivate={(id) => openCaseDialog("action", id)}
               />
             </div>

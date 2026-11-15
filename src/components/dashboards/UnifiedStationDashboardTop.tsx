@@ -119,7 +119,7 @@ export function UnifiedStationDashboardTop({
           received={received}
           targets={monthlyTargets ?? { birth: 0, death: 0 }}
           targetsAvailable={monthlyTargets !== null}
-          warning={targetWarning}
+          {...(targetWarning ? { warning: targetWarning } : {})}
           reportCases={unifiedCases}
           reportsEnabled
           featured

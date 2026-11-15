@@ -77,7 +77,7 @@ export function DashboardGate({
 
   if (user.role === "worker" && workerLayout) {
     return (
-      <div className="h-[calc(100svh-var(--app-header-height,9rem)-4rem)] min-h-0 overflow-hidden px-4 py-1 sm:px-6 sm:py-2 lg:px-8">
+      <div className="h-[calc(100svh-var(--app-header-height,4rem)-4rem)] min-h-0 overflow-hidden px-4 py-1 sm:px-6 sm:py-2 lg:px-8">
         {children}
       </div>
     );

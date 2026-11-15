@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import {
   BookOpen,
@@ -43,36 +43,15 @@ export function Header() {
   } = useApp();
   const [dlg, setDlg] = useState<null | "login" | "manual" | "support">(null);
   const nav = useNavigate();
-  const headerRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const header = headerRef.current;
-    if (!header) return;
-
-    const updateHeight = () => {
-      document.documentElement.style.setProperty(
-        "--app-header-height",
-        `${header.getBoundingClientRect().height}px`,
-      );
-    };
-    updateHeight();
-
-    const observer = new ResizeObserver(updateHeight);
-    observer.observe(header);
-    return () => {
-      observer.disconnect();
-      document.documentElement.style.removeProperty("--app-header-height");
-    };
-  }, []);
 
   return (
-    <header ref={headerRef} className="fixed inset-x-0 top-0 z-50 border-b border-slate-200 bg-white/95 text-slate-800 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 dark:text-slate-100">
+    <header className="fixed inset-x-0 top-0 z-50 h-16 border-b border-slate-200 bg-white/95 text-slate-800 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 dark:text-slate-100">
       {!online && (
-        <div className="flex items-center justify-center gap-2 bg-warning px-3 py-1 text-xs font-medium text-warning-foreground">
+        <div className="absolute inset-x-0 top-full flex items-center justify-center gap-2 border-b border-amber-200 bg-warning px-3 py-1 text-xs font-medium text-warning-foreground shadow-sm">
           <WifiOff className="h-3 w-3" /> {L("অফলাইন — তথ্য ডিভাইসে জমা থাকবে, অনলাইনে এলে স্বয়ংক্রিয়ভাবে সিঙ্ক হবে", "Offline — entries are cached and will auto-sync")}
         </div>
       )}
-      <div className="mx-auto flex h-16 w-full max-w-none flex-nowrap items-center gap-1 px-2 sm:gap-2 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-full w-full max-w-none flex-nowrap items-center gap-1 px-2 sm:gap-2 sm:px-6 lg:px-8">
         <Link to="/" className="mr-auto flex shrink-0 items-center gap-2">
           <span className="grid h-9 w-9 place-items-center rounded-lg bg-emerald-700 text-white"><Landmark className="h-5 w-5" /></span>
           <span className="leading-tight">
@@ -120,35 +99,43 @@ export function Header() {
             <Headphones className="h-6 w-6 max-[400px]:h-5 max-[400px]:w-5" />
           </Button>
           {user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-11 max-w-40 shrink-0 truncate border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 sm:px-4"
-                >
-                  {L(user.name.bn, user.name.en)}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>
-                  <div>{L(user.name.bn, user.name.en)}</div>
-                  <div className="text-xs font-normal text-muted-foreground">{roleLabel(user.role, L)}</div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => nav({ to: "/dashboard" })}>{L("ড্যাশবোর্ড", "Dashboard")}</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => nav({ to: "/security" })}>{L("নিরাপত্তা ও সেশন", "Security & sessions")}</DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={async () => {
-                    await logout();
-                    nav({ to: "/", replace: true });
-                  }}
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  {L("লগআউট", "Logout")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <>
+              <span
+                className="hidden max-w-36 truncate rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 sm:inline-flex dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200"
+                title={roleLabel(user.role, L)}
+              >
+                {roleLabel(user.role, L)}
+              </span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-11 max-w-40 shrink-0 truncate border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 sm:px-4"
+                  >
+                    {L(user.name.bn, user.name.en)}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>
+                    <div>{L(user.name.bn, user.name.en)}</div>
+                    <div className="text-xs font-normal text-muted-foreground">{roleLabel(user.role, L)}</div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => nav({ to: "/dashboard" })}>{L("ড্যাশবোর্ড", "Dashboard")}</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => nav({ to: "/security" })}>{L("নিরাপত্তা ও সেশন", "Security & sessions")}</DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      await logout();
+                      nav({ to: "/", replace: true });
+                    }}
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    {L("লগআউট", "Logout")}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
           ) : demoLoginAvailable ? (
             <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 sm:px-3 sm:text-xs">
               {L("লোকাল টেস্ট মোড", "Local test mode")}

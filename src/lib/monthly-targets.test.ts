@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getCompletionPercent,
   getDhakaMonthYear,
+  getMonthlyCaseCounts,
   getMonthlyStationCaseCounts,
   getMonthlyStatusProgress,
 } from "./monthly-targets";
@@ -108,6 +109,47 @@ describe("union monthly target helpers", () => {
     ).toEqual({
       birth: { pending: 3, progress: 1, completed: 1, total: 4 },
       death: { pending: 0, progress: 0, completed: 0, total: 0 },
+    });
+  });
+
+  it("counts submissions and completions by case type for the Dhaka month", () => {
+    const base = seedState().cases[0]!;
+    const cases = [
+      {
+        ...base,
+        id: "birth-pending",
+        type: "birth" as const,
+        createdAt: Date.parse("2026-10-02T12:00:00+06:00"),
+        status: "pending" as const,
+      },
+      {
+        ...base,
+        id: "birth-progress",
+        type: "birth" as const,
+        createdAt: Date.parse("2026-10-03T12:00:00+06:00"),
+        status: "progress" as const,
+      },
+      {
+        ...base,
+        id: "death-completed-from-prior-month",
+        type: "death" as const,
+        createdAt: Date.parse("2026-09-30T12:00:00+06:00"),
+        completedAt: Date.parse("2026-10-04T12:00:00+06:00"),
+        status: "completed" as const,
+      },
+      {
+        ...base,
+        id: "death-completed-without-completion-date",
+        type: "death" as const,
+        createdAt: Date.parse("2026-10-05T12:00:00+06:00"),
+        completedAt: undefined,
+        status: "completed" as const,
+      },
+    ];
+
+    expect(getMonthlyCaseCounts(cases, "2026-10-01")).toEqual({
+      birth: { pending: 1, progress: 1, completed: 0, total: 2 },
+      death: { pending: 0, progress: 0, completed: 2, total: 1 },
     });
   });
 });

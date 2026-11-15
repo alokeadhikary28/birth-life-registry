@@ -35,12 +35,12 @@ describe("role-based quick access actions", () => {
   });
 
   it("preserves role-specific report and monitoring destinations", () => {
-    expect(getQuickAccessActionsForRole("public")[4].id).toBe("reports");
-    expect(getQuickAccessActionsForRole("uno")[4].id).toBe("reports");
-    expect(getQuickAccessActionsForRole("worker")[4].id).toBe("worker-report");
+    expect(getQuickAccessActionsForRole("public")[4]?.id).toBe("reports");
+    expect(getQuickAccessActionsForRole("uno")[4]?.id).toBe("reports");
+    expect(getQuickAccessActionsForRole("worker")[4]?.id).toBe("worker-report");
 
-    expect(getQuickAccessActionsForRole("admin")[5].link).toBe("/union-master");
-    expect(getQuickAccessActionsForRole("uno")[5].link).toBe("/monitoring");
-    expect(getQuickAccessActionsForRole("worker")[5].link).toBeUndefined();
+    expect(getQuickAccessActionsForRole("admin")[5]?.link).toBe("/union-master");
+    expect(getQuickAccessActionsForRole("uno")[5]?.link).toBe("/monitoring");
+    expect(getQuickAccessActionsForRole("worker")[5]?.link).toBeUndefined();
   });
 });

@@ -103,5 +103,11 @@ describe("union monthly target helpers", () => {
       birth: { pending: 2, progress: 1, completed: 1, total: 3 },
       death: { pending: 0, progress: 0, completed: 0, total: 0 },
     });
+    expect(
+      getMonthlyStationCaseCounts(cases, "manirampur", undefined, "2026-10-01"),
+    ).toEqual({
+      birth: { pending: 3, progress: 1, completed: 1, total: 4 },
+      death: { pending: 0, progress: 0, completed: 0, total: 0 },
+    });
   });
 });

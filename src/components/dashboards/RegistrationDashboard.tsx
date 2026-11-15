@@ -1,8 +1,6 @@
 ﻿import { Fragment, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import {
-  ArrowUpRight,
-  Activity,
   Baby,
   CalendarCheck2,
   ChartNoAxesCombined,
@@ -76,34 +74,35 @@ import { downloadCSV, printPDF } from "@/lib/report";
 import { seedState } from "@/lib/seed";
 import { isPolicyReadOnlyRole, type PreviewRole } from "@/lib/dashboard-roles";
 import { simulateJurisdiction } from "@/lib/jurisdiction-simulation";
-import { getDhakaMonthYear, getMonthlyStationCaseCounts } from "@/lib/monthly-targets";
-import { useAssignedRegistrationTarget } from "@/lib/use-assigned-registration-target";
+import {
+  getDhakaMonthYear,
+  getMonthlyCaseCounts,
+  getMonthlyStationCaseCounts,
+} from "@/lib/monthly-targets";
+import {
+  useAssignedRegistrationTarget,
+  useUpazilaRegistrationTargets,
+} from "@/lib/use-assigned-registration-target";
 import { getStationsForUpazila, getTargetEntryStations } from "@/lib/monirampur-stations";
 import { readDemoRegistrationTargets } from "@/lib/registration-targets";
 import {
   MonthlyProgressCard,
   type MonthlyProgressCounts,
 } from "@/components/dashboards/MonthlyProgressCard";
+import {
+  QuickAccessPanel,
+} from "@/components/dashboards/QuickAccess";
+import {
+  getQuickAccessActionsForRole,
+  type RoleAction,
+} from "@/components/dashboards/quick-access-config";
 import { LoginDialog } from "@/components/Header";
 import { WorkerApplicationListPage } from "@/components/modules/WorkerApplicationListPage";
 import { AdministrativeErrorBoundary } from "@/components/AdministrativeErrorBoundary";
 import { WardKpiPanel } from "@/components/dashboards/WardKpiPanel";
-import { AssignedUnionHeader } from "@/components/dashboards/AssignedUnionHeader";
 import { printAdministrativeLetter } from "@/components/dashboards/print-birth-greeting-letter";
 
 type DashboardRole = Role | "public";
-type ActionFilter = "birth" | "death" | "pending" | "progress" | "completed" | "urgent";
-type RoleAction = {
-  id: string;
-  titleBn: string;
-  titleEn: string;
-  descriptionBn: string;
-  descriptionEn: string;
-  Icon?: typeof MapPinned;
-  icon?: string;
-  link?: "/monitoring" | "/union-master";
-  filter?: ActionFilter;
-};
 type AdminRecord = {
   id: string;
   caseId: string;
@@ -642,14 +641,6 @@ function ApplicationList({
   );
 }
 
-function monthKey(timestamp: number) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Dhaka",
-    year: "numeric",
-    month: "2-digit",
-  }).format(timestamp);
-}
-
 const LOCAL_ADMIN_PREVIEW_STATION_ID = "mn-dhakuria";
 
 function createLocalAdminPreviewCases(seedCases: RegCase[], stationId: string) {
@@ -1070,105 +1061,6 @@ const roleActions: Record<Exclude<DashboardRole, "public" | "super" | "district"
   ],
 };
 
-function QuickAccessCard({
-  item,
-  publicDashboard,
-  onActivate,
-}: {
-  item: {
-    id: string;
-    title: string;
-    description: string;
-    Icon?: RoleAction["Icon"];
-    icon?: string;
-    link?: RoleAction["link"];
-  };
-  publicDashboard: boolean;
-  onActivate: () => void;
-}) {
-  const className =
-    "role-action-card group flex min-h-[3.5rem] cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-1 text-left shadow-sm transition-all hover:scale-[1.02] hover:border-emerald-500 hover:bg-emerald-50/60 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 max-[360px]:min-h-12 max-[360px]:gap-1.5 max-[360px]:px-2 sm:min-h-[3.75rem] sm:gap-3 sm:px-4 max-sm:flex-col max-sm:justify-center max-sm:px-1 max-sm:py-1 max-sm:text-center";
-  const content = (
-    <>
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white transition-colors group-hover:bg-emerald-800 max-sm:hidden">
-        {item.icon ? (
-          <span className="text-xl leading-none" aria-hidden="true">
-            {item.icon}
-          </span>
-        ) : item.Icon ? (
-          <item.Icon className="h-4 w-4" aria-hidden="true" />
-        ) : null}
-      </span>
-      <span className="flex-1 max-sm:w-full">
-        <span className="flex items-start gap-1 text-xs font-bold text-[#102a43] sm:text-sm max-sm:justify-center max-sm:text-[10px]">
-          <span className="min-w-0 flex-1 break-words">{item.title}</span>
-          <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" aria-hidden="true" />
-        </span>
-        <span className="mt-0.5 block whitespace-normal break-words text-[10px] text-slate-500 max-[360px]:hidden sm:text-xs max-sm:hidden">
-          {item.description}
-        </span>
-      </span>
-    </>
-  );
-
-  if (item.link) {
-    return (
-      <Link to={item.link} className={className}>
-        {content}
-      </Link>
-    );
-  }
-
-  if (publicDashboard) {
-    switch (item.id) {
-      case "reports":
-        return (
-          <Link to="/dashboard/$section" params={{ section: "unions" }} className={className}>
-            {content}
-          </Link>
-        );
-      case "deadlines":
-        return (
-          <Link to="/dashboard/$section" params={{ section: "compliance" }} className={className}>
-            {content}
-          </Link>
-        );
-      case "national-summary":
-        return (
-          <Link to="/monitoring" className={className}>
-            {content}
-          </Link>
-        );
-      case "announcements":
-        return (
-          <Link to="/announcements" className={className}>
-            {content}
-          </Link>
-        );
-      case "notice-management":
-        return (
-          <Link to="/monitoring" className={className}>
-            {content}
-          </Link>
-        );
-      case "worker-report":
-      case "feedback":
-        return (
-          <button type="button" onClick={onActivate} className={className}>
-            {content}
-          </button>
-        );
-    }
-    return null;
-  }
-
-  return (
-    <button type="button" onClick={onActivate} className={className}>
-      {content}
-    </button>
-  );
-}
-
 export function RegistrationDashboard({
   role = "public",
   simulationRole,
@@ -1182,8 +1074,18 @@ export function RegistrationDashboard({
   initialAction?: "worker-report" | "feedback";
   onActionDismiss?: () => void;
 }) {
-  const { state, L, n, user, demoMode, activeUnionId, patchCase, setActiveUnionId, findVillage } =
-    useApp();
+  const {
+    state,
+    L,
+    n,
+    user,
+    demoMode,
+    caseLoadError,
+    activeUnionId,
+    patchCase,
+    setActiveUnionId,
+    findVillage,
+  } = useApp();
   const simulationEnabled = import.meta.env.DEV && simulationRole !== undefined;
   const isStationSelectorPreview =
     simulationEnabled &&
@@ -1245,6 +1147,7 @@ export function RegistrationDashboard({
   );
   const [correctionSearch, setCorrectionSearch] = useState("");
   const stationMonthlyMetrics = useAssignedRegistrationTarget();
+  const upazilaRegistrationTargets = useUpazilaRegistrationTargets();
   const [localPreviewTarget, setLocalPreviewTarget] = useState<{
     unionId: string;
     birth: number;
@@ -1399,10 +1302,11 @@ export function RegistrationDashboard({
   ];
   const roleConfig = role === "super" || role === "district" ? "uno" : role;
   const isExecutiveQuickAccess = role === "uno" || role === "district" || role === "super";
-  const roleActionItems =
+  const allRoleActionItems =
     readOnlyPolicyPanel || roleConfig === "public"
       ? publicActions
       : [
+          ...(isExecutiveQuickAccess ? executiveQuickAccessActions : []),
           ...roleActions[roleConfig],
           ...(roleConfig === "worker"
             ? []
@@ -1425,20 +1329,22 @@ export function RegistrationDashboard({
                 },
               ]),
         ];
-  const actions = roleActionItems.map(
-    ({ titleBn, titleEn, descriptionBn, descriptionEn, ...action }) => ({
-      ...action,
-      title: L(titleBn, titleEn),
-      description: L(descriptionBn, descriptionEn),
-    }),
+  const roleActionItems = allRoleActionItems.filter(
+    (action, index) => allRoleActionItems.findIndex((item) => item.id === action.id) === index,
   );
-  const executiveQuickAccessItems = executiveQuickAccessActions.map(
-    ({ titleBn, titleEn, descriptionBn, descriptionEn, ...action }) => ({
-      ...action,
-      title: L(titleBn, titleEn),
-      description: L(descriptionBn, descriptionEn),
-    }),
+  const quickAccessActionItems = getQuickAccessActionsForRole(role);
+  const allActionItems = [...roleActionItems, ...quickAccessActionItems].filter(
+    (action, index, items) => items.findIndex((item) => item.id === action.id) === index,
   );
+  const resolveActionLabel = (
+    { titleBn, titleEn, descriptionBn, descriptionEn, ...action }: RoleAction,
+  ) => ({
+    ...action,
+    title: L(titleBn, titleEn),
+    description: L(descriptionBn, descriptionEn),
+  });
+  const actions = allActionItems.map(resolveActionLabel);
+  const quickAccessActions = quickAccessActionItems.map(resolveActionLabel);
   const roleScopedCases = useMemo(() => {
     if (isLocalAdminPreview) {
       return simulationEnabled ? masterPreviewCases : localPreviewCases;
@@ -1526,40 +1432,14 @@ export function RegistrationDashboard({
     state.cases,
     user,
   ]);
-  const currentMonth = monthKey(Date.now());
-  const monthCases = filteredCases.filter((item) => monthKey(item.createdAt) === currentMonth);
-  const localMetricMonthCases = isLocalAdminPreview
-    ? monthCases.filter(
+  const targetMonthYear = getDhakaMonthYear();
+  const localMetricCases = isLocalAdminPreview
+    ? filteredCases.filter(
         (item) =>
           item.upazilaId === "manirampur" && (item.stationId ?? item.unionId) === previewStationId,
       )
-    : monthCases;
-  const localMonthlyCounts: MonthlyProgressCounts = {
-    birth: {
-      pending: localMetricMonthCases.filter(
-        (item) => item.type === "birth" && item.status === "pending",
-      ).length,
-      progress: localMetricMonthCases.filter(
-        (item) => item.type === "birth" && item.status === "progress",
-      ).length,
-      completed: localMetricMonthCases.filter(
-        (item) => item.type === "birth" && item.status === "completed",
-      ).length,
-      total: localMetricMonthCases.filter((item) => item.type === "birth").length,
-    },
-    death: {
-      pending: localMetricMonthCases.filter(
-        (item) => item.type === "death" && item.status === "pending",
-      ).length,
-      progress: localMetricMonthCases.filter(
-        (item) => item.type === "death" && item.status === "progress",
-      ).length,
-      completed: localMetricMonthCases.filter(
-        (item) => item.type === "death" && item.status === "completed",
-      ).length,
-      total: localMetricMonthCases.filter((item) => item.type === "death").length,
-    },
-  };
+    : filteredCases;
+  const localMonthlyCounts = getMonthlyCaseCounts(localMetricCases, targetMonthYear);
   const sharedStationRoleView =
     roleConfig === "admin" || roleConfig === "worker" || roleConfig === "police";
   const usesStationMetrics =
@@ -1567,6 +1447,8 @@ export function RegistrationDashboard({
     !isLocalAdminPreview &&
     sharedStationRoleView &&
     (user?.role === "admin" || user?.role === "worker" || user?.role === "police");
+  const caseDataAvailable =
+    !caseLoadError && (demoMode || Boolean(user) || import.meta.env.DEV);
   const monthlyCounts: MonthlyProgressCounts = usesStationMetrics
     ? (stationMonthlyMetrics?.counts ?? {
         birth: { pending: 0, progress: 0, completed: 0, total: 0 },
@@ -1575,6 +1457,9 @@ export function RegistrationDashboard({
     : isStationSelectorPreview
       ? previewStationMetrics
       : localMonthlyCounts;
+  const monthlyCountsAvailable = usesStationMetrics
+    ? stationMonthlyMetrics !== null
+    : caseDataAvailable;
   const scopeUpazilaId = user?.upazilaId ?? (isLocalAdminPreview ? "manirampur" : undefined);
   const scopeUnionId = user
     ? (user.stationId ?? user.unionId)
@@ -1587,6 +1472,40 @@ export function RegistrationDashboard({
       )
     : undefined;
   const assignedUnion = assignedUpazila?.unions.find((item) => item.id === scopeUnionId);
+  const usesSubmittedUpazilaTargets = roleConfig === "uno" && user?.role === "uno";
+  const submittedUpazilaTarget = (() => {
+    if (
+      !usesSubmittedUpazilaTargets ||
+      !assignedUpazila ||
+      !upazilaRegistrationTargets.targets
+    ) return null;
+
+    const submittedByUnion = new Map(
+      upazilaRegistrationTargets.targets
+        .filter((target) => target.status === "submitted")
+        .map((target) => [target.union_id, target]),
+    );
+    const targetStations = getTargetEntryStations(
+      assignedUpazila.id,
+      assignedUpazila.unions,
+    );
+    if (
+      !targetStations.length ||
+      targetStations.some((station) => !submittedByUnion.has(station.id))
+    ) return null;
+
+    return targetStations.reduce(
+      (totals, station) => {
+        const target = submittedByUnion.get(station.id);
+        if (target) {
+          totals.birth += target.birth_target;
+          totals.death += target.death_target;
+        }
+        return totals;
+      },
+      { birth: 0, death: 0 },
+    );
+  })();
   const scopedUpazilas = (isLocalAdminPreview ? localPreviewSeed.upazilas : state.upazilas).filter(
     (item) => {
       if (!user || user.role === "super") return true;
@@ -1612,7 +1531,6 @@ export function RegistrationDashboard({
                 : roleConfig === "worker" || roleConfig === "police"
                   ? 1
                   : Math.max(1, selectedUnionCount));
-  const targetMonthYear = getDhakaMonthYear();
   const activeUnionTarget = isLocalStationPreview
     ? localPreviewTarget?.unionId === previewStationId
       ? localPreviewTarget
@@ -1631,12 +1549,18 @@ export function RegistrationDashboard({
   const monthlyTargets = {
     birth:
       activeUnionTarget?.birth ??
-      (isStationSelectorPreview || (requiresSubmittedUnionTarget && !isLocalAdminPreview)
+      submittedUpazilaTarget?.birth ??
+      (isStationSelectorPreview ||
+      (requiresSubmittedUnionTarget && !isLocalAdminPreview) ||
+      (usesSubmittedUpazilaTargets && !submittedUpazilaTarget)
         ? 0
         : Math.ceil(TARGET.birth * monthlyTargetScale)),
     death:
       activeUnionTarget?.death ??
-      (isStationSelectorPreview || (requiresSubmittedUnionTarget && !isLocalAdminPreview)
+      submittedUpazilaTarget?.death ??
+      (isStationSelectorPreview ||
+      (requiresSubmittedUnionTarget && !isLocalAdminPreview) ||
+      (usesSubmittedUpazilaTargets && !submittedUpazilaTarget)
         ? 0
         : Math.ceil(TARGET.death * monthlyTargetScale)),
   };
@@ -1645,9 +1569,18 @@ export function RegistrationDashboard({
       ? L("স্টেশনের সামগ্রিক তথ্য লোড করা যায়নি", "Station aggregate could not be loaded")
       : requiresSubmittedUnionTarget && !activeUnionTarget
         ? L(
-            "এই মাসের জন্য UNO-এর জমা দেওয়া লক্ষ্যমাত্রা পাওয়া যায়নি",
-            "No submitted UNO target was found for this month",
+            "এই স্টেশনের জন্য জমা দেওয়া মাসিক লক্ষ্যমাত্রা পাওয়া যায়নি",
+            "No submitted monthly target was found for this station",
           )
+        : usesSubmittedUpazilaTargets && upazilaRegistrationTargets.error
+          ? L("লক্ষ্যমাত্রা লোড করা যায়নি", "Could not load registration targets")
+          : usesSubmittedUpazilaTargets && upazilaRegistrationTargets.loading
+            ? L("লক্ষ্যমাত্রা লোড হচ্ছে", "Loading submitted targets")
+            : usesSubmittedUpazilaTargets && !submittedUpazilaTarget
+              ? L(
+                  "এই মাসের জন্য সব ইউনিয়নের জমা দেওয়া লক্ষ্যমাত্রা পাওয়া যায়নি",
+                  "Submitted targets are incomplete for this month",
+                )
         : undefined;
   const monthlyTarget = monthlyTargets.birth + monthlyTargets.death;
   const monthlyReceived =
@@ -1832,9 +1765,6 @@ export function RegistrationDashboard({
     isLocalAdminPreview ||
     (!!user && ["admin", "district", "uno", "super"].includes(user.role));
 
-  const quickAccessActions = isExecutiveQuickAccess
-    ? executiveQuickAccessItems
-    : actions.filter((action) => action.id !== "worker-report").slice(0, 4);
   const isEntryCard = activeCard?.id === "birth-entry" || activeCard?.id === "death-entry";
   const formType: "birth" | "death" | null =
     editEntry?.type ??
@@ -2231,7 +2161,7 @@ export function RegistrationDashboard({
   };
 
   return (
-    <section className="dashboard-content flex h-full min-h-0 flex-col overflow-y-auto bg-gradient-to-br from-slate-50 via-[#f3f7f8] to-teal-50/60 text-[#102a43]">
+    <section className="dashboard-content flex h-full min-h-0 flex-col overflow-y-auto bg-slate-50 text-slate-900">
       {applicationListType && roleConfig === "admin" && !editEntry ? (
         <div className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col gap-2 px-4 py-2 sm:px-6 lg:px-6">
           {administrativeList ? (
@@ -2252,136 +2182,34 @@ export function RegistrationDashboard({
         </div>
       ) : (
         <div className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col gap-1 px-4 py-1 max-[360px]:gap-1 max-[360px]:py-1 sm:gap-1.5 sm:px-6 sm:py-1.5 lg:px-8">
-          {isLocalStationPreview && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-white/90 px-3 py-2 shadow-sm">
-              <label
-                htmlFor="preview-station-switcher"
-                className="text-sm font-bold text-emerald-950"
-              >
-                {L("পরীক্ষার স্টেশন", "Test station")}
-              </label>
-              <Select
-                value={previewStationId}
-                onValueChange={(stationId) => {
-                  setPreviewStationId(stationId);
-                  setActiveUnionId(stationId);
-                  if (isLocalAdminPreview) {
-                    setLocalPreviewCases(
-                      createLocalAdminPreviewCases(masterPreviewCases, stationId),
-                    );
-                  }
-                }}
-              >
-                <SelectTrigger
-                  id="preview-station-switcher"
-                  className="ml-auto w-full max-w-sm border-emerald-300 bg-white"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {previewStations.map((station) => (
-                    <SelectItem key={station.id} value={station.id}>
-                      {L(station.bn, station.en)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          <div className="grid min-h-0 flex-1 gap-1 sm:gap-2 lg:grid-cols-[0.72fr_1.28fr] lg:items-center lg:gap-3">
-            <div className="flex min-h-0 flex-col justify-center">
-              {isStationSelectorPreview ? (
-                <AssignedUnionHeader stationId={previewStationId} upazilaId="manirampur" />
-              ) : sharedStationRoleView &&
-                user?.role &&
-                ["admin", "worker", "police"].includes(user.role) ? (
-                <AssignedUnionHeader
-                  stationId={user.stationId ?? user.unionId}
-                  upazilaId={user.upazilaId}
-                />
-              ) : unionFullLabel && badgeUnionId ? (
-                <p className="mb-1 max-w-3xl text-sm font-extrabold leading-snug text-emerald-950 sm:text-base">
-                  {unionFullLabel}
-                </p>
-              ) : null}
-              <h1 className="max-w-3xl font-display text-2xl font-bold leading-tight tracking-tight text-[#102a43] max-[360px]:text-xl sm:text-3xl lg:text-4xl">
-                ই-নিবন্ধন ট্র্যাকার
-              </h1>
-              <p className="mt-1 max-w-3xl text-xs font-semibold leading-snug text-teal-800 max-[360px]:text-[11px] sm:text-sm lg:text-base">
-                Birth &amp; Death Registration 365-Day Compliance System
-              </p>
-              <p className="mt-1 max-w-3xl text-[11px] font-medium leading-snug text-slate-700 sm:text-xs">
-                {L(
-                  "জন্মের ৩৬৫ দিনের মধ্যে জন্ম ও মৃত্যু নিবন্ধন নিশ্চিতকরণ ব্যবস্থা",
-                  "A system to ensure birth and death registration within 365 days",
-                )}
-              </p>
-              {readOnlyPolicyPanel && (
-                <p className="mt-2 w-fit rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-900">
-                  {L("(নীতিমালা ও পর্যবেক্ষণ প্যানেল)", "(Policy & Oversight Panel)")}
-                </p>
-              )}
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white/90 px-2.5 py-1 text-[11px] font-bold text-emerald-800 shadow-sm sm:text-xs">
-                  <Activity className="h-3.5 w-3.5" aria-hidden="true" />
-                  {L("লাইভ সিস্টেম আপডেট", "Live system updates")}
-                </span>
-                <span className="rounded-full border border-slate-200 bg-white/75 px-2.5 py-1 text-[11px] font-semibold text-slate-700 sm:text-xs">
-                  {L(
-                    `${n(filteredCases.length)}টি রেকর্ড পর্যবেক্ষণে`,
-                    `${n(filteredCases.length)} records monitored`,
-                  )}
-                </span>
-                {jurisdictionScope && (
-                  <span className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-bold text-violet-800 shadow-sm sm:text-xs">
-                    {L("ডেভেলপমেন্ট সিমুলেশন", "Development simulation")}
-                  </span>
-                )}
-              </div>
+          <div className="grid min-h-0 flex-1 -ml-4 grid-cols-1 auto-rows-max gap-3 sm:-ml-6 lg:-ml-8 lg:grid-cols-[23rem_minmax(0,1fr)] lg:items-stretch lg:gap-4">
+            <div className="flex min-h-max flex-col justify-start gap-3 rounded-r-2xl bg-slate-800 p-4 shadow-lg lg:gap-3">
+              <QuickAccessPanel
+                actions={quickAccessActions}
+                title={L("দ্রুত প্রবেশ", "Quick actions")}
+                publicDashboard={roleConfig === "public" || isExecutiveQuickAccess}
+                onActivate={(id) => openCaseDialog("action", id)}
+              />
             </div>
 
-            <MonthlyProgressCard
-              counts={monthlyCounts}
-              received={monthlyReceived}
-              targets={monthlyTargets}
-              reportCases={unifiedStationCases}
-              reportsEnabled={
-                sharedStationRoleView ||
-                isLocalAdminPreview ||
-                (!!user && ["admin", "district", "uno", "super"].includes(user.role))
-              }
-              featured
-              {...(monthlyTargetWarning ? { warning: monthlyTargetWarning } : {})}
-            />
+            <div className="flex min-w-0 flex-col gap-3">
+              <MonthlyProgressCard
+                counts={monthlyCounts}
+                countsAvailable={monthlyCountsAvailable}
+                received={monthlyReceived}
+                targets={monthlyTargets}
+                targetsAvailable={!monthlyTargetWarning}
+                reportCases={unifiedStationCases}
+                reportsEnabled={
+                  sharedStationRoleView ||
+                  isLocalAdminPreview ||
+                  (!!user && ["admin", "district", "uno", "super"].includes(user.role))
+                }
+                featured
+                {...(monthlyTargetWarning ? { warning: monthlyTargetWarning } : {})}
+              />
+            </div>
           </div>
-
-          <section className="shrink-0" aria-labelledby="quick-actions-heading">
-            <div className="mb-1">
-              <h2
-                id="quick-actions-heading"
-                className="font-display text-sm font-bold text-[#102a43]"
-              >
-                {L("দ্রুত প্রবেশ", "Quick actions")}
-              </h2>
-            </div>
-            <div className={"grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4"}>
-              {quickAccessActions.map(({ id, title, description, Icon, icon, link }) => (
-                <QuickAccessCard
-                  key={id}
-                  item={{
-                    id,
-                    title,
-                    description,
-                    ...(Icon ? { Icon } : {}),
-                    ...(icon ? { icon } : {}),
-                    ...(link ? { link } : {}),
-                  }}
-                  publicDashboard={roleConfig === "public" || isExecutiveQuickAccess}
-                  onActivate={() => openCaseDialog("action", id)}
-                />
-              ))}
-            </div>
-          </section>
         </div>
       )}
       <Dialog

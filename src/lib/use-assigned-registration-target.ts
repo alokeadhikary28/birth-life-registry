@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getDhakaMonthYear } from "@/lib/monthly-targets";
-import { readDemoRegistrationTargets, type SavedRegistrationTarget } from "@/lib/registration-targets";
-import { loadUpazilaRegistrationTargets } from "@/lib/registration-targets.functions";
 import { useApp } from "@/lib/store";
 
 export type CaseCounts = {
@@ -155,63 +153,4 @@ export function useAssignedRegistrationTarget(): StationMonthlyMetrics | null {
     return null;
   }
   return metrics;
-}
-
-type UpazilaTargetLoadState = {
-  key: string;
-  status: "loading" | "ready" | "error";
-  targets?: SavedRegistrationTarget[];
-};
-
-export function useUpazilaRegistrationTargets(
-  monthYear = getDhakaMonthYear(),
-): {
-  targets: SavedRegistrationTarget[] | null;
-  loading: boolean;
-  error: boolean;
-} {
-  const { L, user, demoMode } = useApp();
-  const upazilaId = user?.role === "uno" ? user.upazilaId : undefined;
-  const key =
-    user && upazilaId
-      ? `${user.id}:${upazilaId}:${monthYear}:${demoMode ? "demo" : "live"}`
-      : null;
-  const [loadState, setLoadState] = useState<UpazilaTargetLoadState | null>(null);
-
-  useEffect(() => {
-    if (!key || !upazilaId) {
-      setLoadState(null);
-      return;
-    }
-
-    let active = true;
-    setLoadState({ key, status: "loading" });
-
-    const loadTargets = async () =>
-      demoMode
-        ? readDemoRegistrationTargets(upazilaId, monthYear)
-        : (await loadUpazilaRegistrationTargets({ data: { monthYear } })).targets;
-
-    void loadTargets()
-      .then((targets) => {
-        if (active) setLoadState({ key, status: "ready", targets });
-      })
-      .catch((error: unknown) => {
-        if (!active) return;
-        console.error("Failed to load Upazila registration targets", error);
-        setLoadState({ key, status: "error" });
-        toast.error(L("লক্ষ্যমাত্রা লোড করা যায়নি", "Could not load registration targets"));
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [L, demoMode, key, monthYear, upazilaId]);
-
-  const currentState = loadState?.key === key ? loadState : null;
-  return {
-    targets: currentState?.status === "ready" ? currentState.targets ?? [] : null,
-    loading: !!key && (!currentState || currentState.status === "loading"),
-    error: currentState?.status === "error",
-  };
 }

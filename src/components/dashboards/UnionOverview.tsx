@@ -79,7 +79,7 @@ export function UnionOverview({ unionId }: { unionId: string | undefined }) {
       />
 
       <section
-        className="mb-6 rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm sm:p-6"
+        className="mb-6 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-5 shadow-sm sm:p-6"
         aria-labelledby="union-profile-title"
       >
         <div className="flex items-start gap-4">
@@ -93,7 +93,7 @@ export function UnionOverview({ unionId }: { unionId: string | undefined }) {
           <div>
             <h2
               id="union-profile-title"
-              className="font-display text-lg font-bold text-slate-900"
+              className="font-display text-lg font-bold text-emerald-950"
             >
               {placeName}
             </h2>

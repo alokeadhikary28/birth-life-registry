@@ -51,8 +51,8 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   return (
     <>
       <Header />
-      <main className="box-border min-h-[calc(100svh-4rem)] bg-background pt-[var(--app-header-height,4rem)]">
-        <div className="flex min-h-[calc(100svh-var(--app-header-height,4rem))] items-center justify-center px-4">
+      <main className="box-border min-h-[calc(100svh-4rem)] bg-background pt-[var(--app-header-height,9rem)]">
+        <div className="flex min-h-[calc(100svh-var(--app-header-height,9rem))] items-center justify-center px-4">
           <div className="max-w-md text-center">
             <h1 className="text-xl font-semibold tracking-tight text-foreground">
               This page didn't load
@@ -96,7 +96,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
-      { name: "theme-color", content: "#f8fafc" },
+      { name: "theme-color", content: "#16a34a" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "default" },
@@ -158,8 +158,8 @@ function RootComponent() {
       <main
         className={
           dashboardViewport
-            ? "dashboard-viewport box-border flex min-h-0 flex-col pt-[var(--app-header-height,4rem)]"
-            : "box-border min-h-[calc(100svh-4rem)] pt-[var(--app-header-height,4rem)]"
+            ? "dashboard-viewport box-border flex min-h-0 flex-col pt-[var(--app-header-height,9rem)]"
+            : "box-border min-h-[calc(100svh-4rem)] pt-[var(--app-header-height,9rem)]"
         }
       >
         <Outlet />

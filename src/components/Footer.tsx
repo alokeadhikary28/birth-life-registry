@@ -7,32 +7,32 @@ export function Footer({ compact = false }: { compact?: boolean }) {
 
   if (compact) {
     return (
-      <footer className="min-h-16 w-full shrink-0 border-t border-slate-200 bg-white py-1 text-slate-600 shadow-[0_-8px_24px_-20px_rgba(15,23,42,0.12)] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+      <footer className="min-h-16 w-full shrink-0 border-t border-emerald-700 bg-gradient-to-r from-[#70c158] to-[#5cb84b] py-1 text-white shadow-[0_-8px_24px_-20px_rgba(15,23,42,0.4)]">
         <div className="mx-auto flex min-h-14 w-full max-w-none flex-col items-center justify-center gap-1 px-4 text-xs leading-tight max-[360px]:text-[10px] sm:flex-row sm:justify-between sm:gap-3 sm:px-6 sm:text-sm lg:px-8">
           <p className="flex shrink-0 items-center gap-1.5 whitespace-nowrap font-display font-semibold">
-            <Landmark className="h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-300" aria-hidden="true" />
+            <Landmark className="h-3.5 w-3.5 shrink-0 text-emerald-100" aria-hidden="true" />
             <span>{L("ই-নিবন্ধন ট্র্যাকার", "E-Registration Tracker")}</span>
-            <span className="font-sans text-slate-400 dark:text-slate-500">© {L("২০২৬", "2026")}</span>
+            <span className="font-sans text-emerald-100">© {L("২০২৬", "2026")}</span>
           </p>
           <nav
             aria-label={L("দ্রুত লিংক ও সহায়তা", "Quick links and help")}
-            className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-slate-600 dark:text-slate-300 sm:justify-end sm:gap-x-4"
+            className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-emerald-50 sm:justify-end sm:gap-x-4"
           >
-            <Link to="/dashboard" className="transition-colors hover:text-emerald-800 dark:hover:text-emerald-300 focus-visible:underline">
+            <Link to="/dashboard" className="hover:text-white focus-visible:underline">
               {L("ড্যাশবোর্ড", "Dashboard")}
             </Link>
             <Link
               to="/dashboard/$section"
               params={{ section: "unions" }}
-              className="transition-colors hover:text-emerald-800 dark:hover:text-emerald-300 focus-visible:underline"
+              className="hover:text-white focus-visible:underline"
             >
               {L("প্রতিবেদন", "Reports")}
             </Link>
-            <span className="text-slate-400 dark:text-slate-500">{L("গোপনীয়তা নীতি", "Privacy Policy")}</span>
+            <span className="text-emerald-100">{L("গোপনীয়তা নীতি", "Privacy Policy")}</span>
             <Link
               to="/dashboard/$section"
               params={{ section: "compliance" }}
-              className="font-medium text-emerald-700 transition-colors hover:text-emerald-900 dark:text-emerald-300 dark:hover:text-emerald-200 focus-visible:underline"
+              className="font-medium text-white hover:text-emerald-100 focus-visible:underline"
             >
               {L("আইন ও সহায়তা · ৩৬৫ দিন", "Legal & Help · 365 Days")}
             </Link>

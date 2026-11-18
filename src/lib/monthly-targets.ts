@@ -17,19 +17,7 @@ export function getDhakaMonthYear(date = new Date()): string {
 export function getMonthlyStationCaseCounts(
   cases: readonly RegCase[],
   upazilaId: string,
-  stationId: string | undefined,
-  monthYear: string,
-) {
-  const scopedCases = cases.filter(
-    (item) =>
-      item.upazilaId === upazilaId &&
-      (!stationId || (item.stationId ?? item.unionId) === stationId),
-  );
-  return getMonthlyCaseCounts(scopedCases, monthYear);
-}
-
-export function getMonthlyCaseCounts(
-  cases: readonly RegCase[],
+  stationId: string,
   monthYear: string,
 ) {
   const counts = {
@@ -42,6 +30,11 @@ export function getMonthlyCaseCounts(
   const monthEndTime = Date.UTC(year, month, 1) - 6 * 60 * 60 * 1000;
 
   for (const item of cases) {
+    if (
+      item.upazilaId !== upazilaId ||
+      (item.stationId ?? item.unionId) !== stationId
+    ) continue;
+
     const typeCounts = counts[item.type];
     const submittedAt = item.createdAt;
     const completedAt = item.completedAt ?? item.createdAt;

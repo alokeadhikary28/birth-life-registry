@@ -148,7 +148,6 @@
 }
 
 :root {
-  --app-header-height: 4rem;
   --radius: 0.75rem;
   --success: oklch(0.55 0.13 155);
   --success-foreground: oklch(0.99 0 0);

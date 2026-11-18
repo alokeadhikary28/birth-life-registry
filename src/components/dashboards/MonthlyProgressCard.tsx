@@ -27,52 +27,44 @@ const EMPTY_REPORT_CASES: RegCase[] = [];
 function MetricProgress({
   value,
   target,
-  available = true,
   color,
   trackColor,
 }: {
   value: number;
   target: number;
-  available?: boolean;
   color: string;
   trackColor: string;
 }) {
   const { n } = useApp();
-  const percentage = available && target ? Math.round((value / target) * 100) : 0;
+  const percentage = target ? Math.round((value / target) * 100) : 0;
 
   return (
     <div className="min-w-0 flex-1">
       <div className="mb-1 flex items-center justify-between gap-2 text-base font-semibold">
-        <span className="text-slate-700">{available ? `${n(value)} / ${n(target)}` : "— / —"}</span>
-        <span className="text-lg font-extrabold text-slate-900">
-          {available ? `${n(percentage)}%` : "—"}
-        </span>
+        <span className="text-slate-700">{n(value)} / {n(target)}</span>
+        <span className="text-lg font-extrabold text-slate-900">{n(percentage)}%</span>
       </div>
-      {available && (
+      <div
+        className={`h-1.5 overflow-hidden rounded-full shadow-inner ${trackColor}`}
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.min(100, Math.max(0, percentage))}
+        aria-label={`${n(percentage)}%`}
+      >
         <div
-          className={`h-1.5 overflow-hidden rounded-full shadow-inner ${trackColor}`}
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.min(100, Math.max(0, percentage))}
-          aria-label={`${n(percentage)}%`}
-        >
-          <div
-            className={`h-full rounded-full shadow-sm transition-[width] duration-700 ease-out ${color}`}
-            style={{ width: `${Math.min(100, Math.max(0, percentage))}%` }}
-          />
-        </div>
-      )}
+          className={`h-full rounded-full shadow-sm transition-[width] duration-700 ease-out ${color}`}
+          style={{ width: `${Math.min(100, Math.max(0, percentage))}%` }}
+        />
+      </div>
     </div>
   );
 }
 
 export function MonthlyProgressCard({
   counts,
-  countsAvailable = true,
   received,
   targets,
-  targetsAvailable = true,
   warning,
   compact = false,
   featured = false,
@@ -80,10 +72,8 @@ export function MonthlyProgressCard({
   reportsEnabled = false,
 }: {
   counts: MonthlyProgressCounts;
-  countsAvailable?: boolean;
   received: number;
   targets: { birth: number; death: number };
-  targetsAvailable?: boolean;
   warning?: string;
   compact?: boolean;
   featured?: boolean;
@@ -166,21 +156,13 @@ export function MonthlyProgressCard({
     targets.birth,
     targets.death,
   );
-  const completionText =
-    targetsAvailable && countsAvailable ? `${n(completion)}%` : "—";
-  const completionArc =
-    targetsAvailable && countsAvailable && target > 0
-      ? (Math.min(completed, target) / target) * circumference
-      : 0;
+  const completionArc = (Math.min(completed, target) / Math.max(1, target)) * circumference;
   const statusDetails = (status: "submitted" | "completed" | "progress") =>
     (["birth", "death"] as const).map((type) => {
       const progress = getMonthlyStatusProgress(counts[type], targets[type], status);
-      const valueUnavailable = !countsAvailable;
-      const denominatorUnavailable =
-        valueUnavailable || (status === "submitted" && !targetsAvailable);
       return L(
-        `${type === "birth" ? "জন্ম" : "মৃত্যু"} ${valueUnavailable ? "—" : n(progress.value)} / ${denominatorUnavailable ? "—" : n(progress.denominator)} (${denominatorUnavailable ? "—" : `${n(progress.percentage)}%`})`,
-        `${type === "birth" ? "Birth" : "Death"} ${valueUnavailable ? "—" : n(progress.value)} / ${denominatorUnavailable ? "—" : n(progress.denominator)} (${denominatorUnavailable ? "—" : `${n(progress.percentage)}%`})`,
+        `${type === "birth" ? "জন্ম" : "মৃত্যু"} ${n(progress.value)} / ${n(progress.denominator)} (${n(progress.percentage)}%)`,
+        `${type === "birth" ? "Birth" : "Death"} ${n(progress.value)} / ${n(progress.denominator)} (${n(progress.percentage)}%)`,
       );
     });
   const statusItems = [
@@ -265,14 +247,12 @@ export function MonthlyProgressCard({
       (["birth", "death"] as const).map((type) => {
         const value = countForStatus(status.id, type);
         const typeTarget = getMonthlyStatusProgress(counts[type], targets[type], status.id);
-        const dataUnavailable =
-          !countsAvailable || (status.id === "submitted" && !targetsAvailable);
         return [
           status.label,
           L(type === "birth" ? "জন্ম" : "মৃত্যু", type),
-          countsAvailable ? value : "—",
-          dataUnavailable ? "—" : typeTarget.denominator,
-          dataUnavailable ? "—" : `${typeTarget.percentage}%`,
+          value,
+          typeTarget.denominator,
+          `${typeTarget.percentage}%`,
         ];
       }),
     );
@@ -280,9 +260,9 @@ export function MonthlyProgressCard({
       statusRows.push([
         L("লক্ষ্যমাত্রা সম্পন্ন", "Target completed"),
         L("মোট", "Total"),
-        countsAvailable ? completed : "—",
-        targetsAvailable ? target : "—",
-        completionText,
+        completed,
+        target,
+        `${completion}%`,
       ]);
       if (reportsEnabled) {
         statusRows.push([
@@ -303,9 +283,9 @@ export function MonthlyProgressCard({
   return (
     <>
       <section
-        className={`flex w-full flex-col rounded-2xl border border-slate-200/60 bg-white shadow-sm ${
+        className={`flex w-full flex-col rounded-2xl border border-emerald-200 bg-gradient-to-br from-white via-white to-emerald-50/70 shadow-lg shadow-emerald-900/10 ${
           featured
-            ? "gap-3 p-4 sm:min-h-[25rem] sm:gap-4 sm:p-5 xl:min-h-[27rem] xl:p-6"
+            ? "gap-2 p-3 sm:min-h-[20rem] sm:gap-3 sm:p-4 xl:min-h-[22rem] xl:p-5"
             : compact
               ? "min-h-[17rem] gap-1.5 p-2.5 sm:min-h-[18rem] sm:gap-2 sm:p-3"
               : "min-h-[24rem] p-5 sm:min-h-[25rem] sm:p-6"
@@ -317,13 +297,13 @@ export function MonthlyProgressCard({
           compact
             ? "gap-1.5 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] sm:gap-2"
             : featured
-              ? "gap-3 sm:grid-cols-[minmax(17rem,0.9fr)_minmax(0,1.1fr)] sm:gap-4 xl:gap-6"
+              ? "gap-2 sm:grid-cols-[minmax(12rem,0.9fr)_minmax(0,1.1fr)] sm:gap-4 xl:gap-6"
               : "gap-5 sm:grid-cols-[minmax(14rem,0.9fr)_minmax(0,1.1fr)] sm:gap-6"
         }`}
       >
         <div
-          className={`flex min-w-0 flex-col items-center rounded-xl border border-slate-200/60 bg-white shadow-sm ${
-            featured ? "gap-2 p-3 sm:gap-3 sm:p-4" : compact ? "gap-1.5 p-2" : "gap-3 p-4"
+          className={`flex min-w-0 flex-col items-center rounded-xl border border-slate-100 bg-white shadow-sm ${
+            featured ? "gap-2 p-2 sm:gap-3 sm:p-3" : compact ? "gap-1.5 p-2" : "gap-3 p-4"
           }`}
         >
           <h2
@@ -338,7 +318,7 @@ export function MonthlyProgressCard({
             onClick={() => setSelectedReport("overall")}
             className={`group relative mx-auto shrink-0 transform cursor-pointer rounded-full shadow-md transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:shadow-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 ${
               featured
-                ? "h-52 w-52 sm:h-[17rem] sm:w-[17rem] xl:h-[19rem] xl:w-[19rem]"
+                ? "h-40 w-40 sm:h-52 sm:w-52 xl:h-60 xl:w-60"
                 : compact
                   ? "h-44 w-44 sm:h-52 sm:w-52"
                   : "h-52 w-52 sm:h-56 sm:w-56"
@@ -349,7 +329,7 @@ export function MonthlyProgressCard({
               viewBox="0 0 220 220"
               className="h-full w-full -rotate-90"
               role="img"
-              aria-label={`${completionText} ${L("মাসিক লক্ষ্যমাত্রা সম্পন্ন", "of monthly target completed")}`}
+              aria-label={`${n(completion)}% ${L("মাসিক লক্ষ্যমাত্রা সম্পন্ন", "of monthly target completed")}`}
             >
               <defs>
                 <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
@@ -384,7 +364,7 @@ export function MonthlyProgressCard({
                   featured ? "text-3xl sm:text-4xl xl:text-5xl" : "text-3xl sm:text-4xl"
                 }`}
               >
-                {completionText}
+                {n(completion)}%
               </span>
               <span
                 className={`font-semibold text-slate-500 ${
@@ -403,10 +383,10 @@ export function MonthlyProgressCard({
             </span>
           </button>
         </div>
-        <div className={`flex min-w-0 flex-col ${featured ? "gap-3 sm:gap-4" : "gap-2"}`}>
+        <div className="flex min-w-0 flex-col gap-2">
           <p
             className={`monthly-remaining-pulse flex w-full items-center justify-center text-center font-extrabold text-emerald-700 ${
-            compact ? "text-sm sm:text-lg" : featured ? "text-xl sm:text-2xl" : "text-lg sm:text-xl"
+              compact ? "text-sm sm:text-lg" : "text-lg sm:text-xl"
             }`}
           >
             {L(
@@ -417,7 +397,7 @@ export function MonthlyProgressCard({
           <div
           className={`grid w-full font-bold text-slate-700 ${
             featured
-              ? "gap-2.5 text-sm sm:gap-3 sm:text-base"
+              ? "gap-2 text-sm sm:gap-2.5 sm:text-base"
               : compact
                 ? "gap-1.5 text-xs"
                 : "gap-3 text-sm sm:text-base"
@@ -429,11 +409,11 @@ export function MonthlyProgressCard({
               key={item.id}
               onClick={() => setSelectedReport(item.id)}
               aria-label={L(`${item.label} বিস্তারিত প্রতিবেদন দেখুন`, `View detailed ${item.label} report`)}
-              className={`flex min-w-0 cursor-pointer items-center justify-between rounded-xl border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 ${
+              className={`flex min-w-0 cursor-pointer items-center justify-between rounded-xl border shadow-md transition-all hover:scale-[1.01] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 ${
                 featured && item.details.length > 0
-                  ? "gap-3 p-4 sm:gap-4 sm:p-6"
+                  ? "gap-3 p-3 sm:gap-4 sm:p-4"
                   : featured
-                    ? "gap-3 p-4 sm:gap-4 sm:p-5"
+                    ? "gap-3 p-2.5 sm:gap-4 sm:p-3"
                     : compact
                       ? "gap-2 p-2"
                       : "gap-3 p-3"
@@ -454,10 +434,10 @@ export function MonthlyProgressCard({
               <span className={`shrink-0 text-right ${item.text}`}>
                 <span
                   className={`block font-extrabold ${
-                    featured ? "text-xl sm:text-2xl" : compact ? "text-sm" : "text-base sm:text-lg"
+                    featured ? "text-lg sm:text-xl" : compact ? "text-sm" : "text-base sm:text-lg"
                   }`}
                 >
-                  {countsAvailable ? n(item.value) : "—"}
+                  {n(item.value)}
                 </span>
                 {item.details.length > 0 && (
                   <span
@@ -470,7 +450,7 @@ export function MonthlyProgressCard({
                         key={detail}
                         className={`rounded-md border border-emerald-200/80 bg-white/80 font-semibold text-emerald-900 ${
                           featured
-                            ? "px-2.5 py-1.5 text-xs leading-tight sm:px-3 sm:py-2 sm:text-sm"
+                            ? "px-2 py-1 text-[10px] leading-tight sm:text-xs"
                             : compact
                               ? "px-1 py-0.5 text-[9px] leading-tight sm:text-[10px]"
                               : "px-2 py-1 text-xs sm:text-sm"
@@ -490,14 +470,14 @@ export function MonthlyProgressCard({
       <div
         className={`flex w-full flex-wrap justify-between border-t border-emerald-100 font-semibold text-slate-600 ${
           featured
-            ? "gap-x-3 gap-y-1.5 px-1 pt-3 text-sm sm:pt-4 sm:text-base"
+            ? "gap-x-3 gap-y-1.5 px-1 pt-2 text-xs sm:pt-3 sm:text-sm"
             : compact
               ? "gap-x-2 gap-y-1 px-1 pt-2 text-[11px]"
               : "mt-4 gap-x-4 gap-y-2 px-2 pt-3 text-sm sm:text-base"
         }`}
       >
-        <span>{L("মাসিক সম্পন্ন", "Completed this month")}: {countsAvailable ? n(completed) : "—"} / {targetsAvailable ? n(target) : "—"}</span>
-        <span>{L("মোট প্রাপ্ত আবেদন", "Total applications received")}: {countsAvailable ? n(received) : "—"}</span>
+        <span>{L("মাসিক সম্পন্ন", "Completed this month")}: {n(completed)} / {n(target)}</span>
+        <span>{L("মোট প্রাপ্ত আবেদন", "Total applications received")}: {n(received)}</span>
       </div>
       {warning && (
         <p
@@ -558,11 +538,11 @@ export function MonthlyProgressCard({
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-2xl font-bold leading-tight">{item.label}</p>
                     <span className={`rounded-full bg-white/80 px-2.5 py-0.5 text-3xl font-extrabold shadow-sm ${item.text}`}>
-                      {countsAvailable ? n(item.value) : "—"}
+                      {n(item.value)}
                     </span>
                   </div>
                   <p className="mt-1 text-base font-bold uppercase tracking-wide text-slate-700">
-                    {L("মোট", "Total")}: {countsAvailable ? n(item.value) : "—"}
+                    {L("মোট", "Total")}: {n(item.value)}
                   </p>
                   <div className="mt-2 space-y-2">
                   {(["birth", "death"] as const).map((type) => {
@@ -582,10 +562,6 @@ export function MonthlyProgressCard({
                         <MetricProgress
                           value={value}
                           target={typeTarget.denominator}
-                          available={
-                            countsAvailable &&
-                            (item.id !== "submitted" || targetsAvailable)
-                          }
                           color={type === "birth" ? "bg-blue-500" : "bg-slate-500"}
                           trackColor={type === "birth" ? "bg-blue-100" : "bg-slate-200"}
                         />
@@ -595,25 +571,23 @@ export function MonthlyProgressCard({
                   </div>
                 </div>
               ))}
-              <div className="rounded-2xl border border-slate-200/60 bg-white p-3 shadow-sm md:col-span-3">
+              <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-3 shadow-lg shadow-emerald-900/5 md:col-span-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="text-2xl font-bold leading-tight text-emerald-950">
                       {L("লক্ষ্যমাত্রা সম্পন্ন", "Target completed")}
                     </p>
                     <p className="text-base font-semibold text-slate-700">
-                      {L("মোট প্রাপ্ত আবেদন", "Total applications received")}:                       {countsAvailable ? n(received) : "—"}
+                      {L("মোট প্রাপ্ত আবেদন", "Total applications received")}: {n(received)}
                     </p>
                   </div>
                   <span className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-3xl font-extrabold text-emerald-800 shadow-sm">
-                    {countsAvailable ? n(completed) : "—"} / {targetsAvailable ? n(target) : "—"} · {completionText}
+                    {n(completed)} / {n(target)} · {n(completion)}%
                   </span>
                 </div>
-                {targetsAvailable && countsAvailable && (
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-emerald-100 shadow-inner" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, completion)} aria-label={`${n(completion)}%`}>
-                    <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 shadow-sm transition-[width] duration-700 ease-out" style={{ width: `${Math.min(100, completion)}%` }} />
-                  </div>
-                )}
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-emerald-100 shadow-inner" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, completion)} aria-label={`${n(completion)}%`}>
+                  <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 shadow-sm transition-[width] duration-700 ease-out" style={{ width: `${Math.min(100, completion)}%` }} />
+                </div>
               </div>
               </div>
               {reportsEnabled && (
@@ -677,7 +651,6 @@ export function MonthlyProgressCard({
                       <MetricProgress
                         value={value}
                         target={typeTarget}
-                        available={countsAvailable && (selectedStatus.id !== "submitted" || targetsAvailable)}
                         color={type === "birth" ? "bg-blue-500" : "bg-slate-500"}
                         trackColor={type === "birth" ? "bg-blue-100" : "bg-slate-200"}
                       />

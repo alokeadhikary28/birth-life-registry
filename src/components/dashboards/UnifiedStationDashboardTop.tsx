@@ -1,8 +1,7 @@
 import { useMemo } from "react";
 import { useApp } from "@/lib/store";
 import { getDhakaMonthYear, getMonthlyStationCaseCounts } from "@/lib/monthly-targets";
-import { getTargetEntryStations } from "@/lib/monirampur-stations";
-import { useUpazilaRegistrationTargets } from "@/lib/use-assigned-registration-target";
+import type { RegCase } from "@/lib/types";
 import { MonthlyProgressCard, type MonthlyProgressCounts } from "./MonthlyProgressCard";
 import { AssignedUnionProgressCard } from "./AssignedUnionProgressCard";
 import { AssignedUnionHeader } from "./AssignedUnionHeader";
@@ -22,87 +21,38 @@ export function UnifiedStationDashboardTop({
   const stationId = isAssignedUnionView
     ? user.stationId ?? user.unionId
     : stationIdProp ?? user?.stationId ?? user?.unionId;
-  const assignedUpazila =
-    user?.role === "uno"
-      ? state.upazilas.find((upazila) => upazila.id === user.upazilaId)
-      : undefined;
-  const location = useMemo(() => {
-    if (stationId) {
-      return (assignedUpazila ? [assignedUpazila] : state.upazilas)
+  const location = stationId
+    ? state.upazilas
         .map((upazila) => ({
           upazila,
-          union: getTargetEntryStations(upazila.id, upazila.unions).find(
-            (station) => station.id === stationId,
-          ),
+          union: upazila.unions.find((union) => union.id === stationId),
         }))
-        .find((item) => item.union);
-    }
-    return assignedUpazila ? { upazila: assignedUpazila, union: undefined } : undefined;
-  }, [assignedUpazila, state.upazilas, stationId]);
-  const monthYear = getDhakaMonthYear();
-  const {
-    targets: savedTargets,
-    loading: targetsLoading,
-    error: targetLoadError,
-  } = useUpazilaRegistrationTargets(monthYear);
-  const monthlyTargets = useMemo(() => {
-    if (user?.role !== "uno" || !location) return null;
-    const unionIds = stationId
-      ? [stationId]
-      : getTargetEntryStations(
-          location.upazila.id,
-          location.upazila.unions,
-        ).map((station) => station.id);
-    const submittedByUnion = new Map(
-      (savedTargets ?? [])
-        .filter((target) => target.status === "submitted")
-        .map((target) => [target.union_id, target]),
-    );
-    if (!unionIds.length || unionIds.some((unionId) => !submittedByUnion.has(unionId))) {
-      return null;
-    }
-    return unionIds.reduce(
-      (totals, unionId) => {
-        const target = submittedByUnion.get(unionId);
-        if (target) {
-          totals.birth += target.birth_target;
-          totals.death += target.death_target;
-        }
-        return totals;
-      },
-      { birth: 0, death: 0 },
-    );
-  }, [location, savedTargets, stationId, user?.role]);
-
+        .find((item) => item.union)
+    : undefined;
   const unifiedCases = useMemo(() => {
-    if (!location) return [];
+    if (!stationId) return [];
     return state.cases.filter((item) =>
-      item.upazilaId === location.upazila.id &&
-      (!stationId || (item.stationId ?? item.unionId) === stationId),
+      item.upazilaId === location?.upazila.id &&
+      (item.stationId ?? item.unionId) === stationId,
     );
-  }, [location, state.cases, stationId]);
+  }, [location?.upazila.id, state.cases, stationId]);
 
   const counts = useMemo<MonthlyProgressCounts | undefined>(
     () => {
-      if (isAssignedUnionView || !location) return undefined;
+      if (isAssignedUnionView) return undefined;
       return getMonthlyStationCaseCounts(
         unifiedCases,
-        location.upazila.id,
-        stationId,
-        monthYear,
+        location?.upazila.id ?? "",
+        stationId ?? "",
+        getDhakaMonthYear(),
       );
     },
-    [isAssignedUnionView, location, monthYear, stationId, unifiedCases],
+    [isAssignedUnionView, location?.upazila.id, stationId, unifiedCases],
   );
   const received = counts
     ? (counts.birth.total ?? 0) + (counts.death.total ?? 0)
     : 0;
   const displayedHeaderStationId = headerStationId ?? stationId;
-  const targetWarning = targetLoadError
-    ? L("লক্ষ্যমাত্রা লোড করা যায়নি", "Could not load registration targets")
-    : targetsLoading || monthlyTargets
-      ? undefined
-      : L("নির্বাচিত এলাকার জন্য জমা দেওয়া মাসিক লক্ষ্যমাত্রা পাওয়া যায়নি", "No submitted monthly target is available for this area");
 
   return (
     <div className="grid min-h-0 gap-1 sm:gap-2 lg:grid-cols-[0.72fr_1.28fr] lg:items-center lg:gap-3">
@@ -110,6 +60,18 @@ export function UnifiedStationDashboardTop({
         {showAssignedUnionHeader && displayedHeaderStationId && (
           <AssignedUnionHeader stationId={displayedHeaderStationId} />
         )}
+        <h1 id="e-registration-tracker" className="max-w-3xl scroll-mt-24 font-display text-2xl font-bold leading-tight tracking-tight text-[#102a43] max-[360px]:text-xl sm:text-3xl lg:text-4xl">
+          ই-নিবন্ধন ট্র্যাকার
+        </h1>
+        <p className="mt-1 max-w-3xl text-xs font-semibold leading-snug text-teal-800 max-[360px]:text-[11px] sm:text-sm lg:text-base">
+          Birth &amp; Death Registration 365-Day Compliance System
+        </p>
+        <p className="mt-1 max-w-3xl text-[11px] font-medium leading-snug text-slate-700 sm:text-xs">
+          {L(
+            "জন্মের ৩৬৫ দিনের মধ্যে জন্ম ও মৃত্যু নিবন্ধন নিশ্চিতকরণ ব্যবস্থা",
+            "A system to ensure birth and death registration within 365 days",
+          )}
+        </p>
       </div>
       {isAssignedUnionView ? (
         <AssignedUnionProgressCard />
@@ -117,10 +79,8 @@ export function UnifiedStationDashboardTop({
         <MonthlyProgressCard
           counts={counts}
           received={received}
-          targets={monthlyTargets ?? { birth: 0, death: 0 }}
-          targetsAvailable={monthlyTargets !== null}
-          {...(targetWarning ? { warning: targetWarning } : {})}
-          reportCases={unifiedCases}
+          targets={{ birth: 0, death: 0 }}
+          reportCases={unifiedCases as RegCase[]}
           reportsEnabled
           featured
         />

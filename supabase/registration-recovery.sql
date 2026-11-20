@@ -90,10 +90,71 @@ CREATE TABLE IF NOT EXISTS public.login_attempts (
   reason text
 );
 
+ALTER TABLE public.login_attempts
+  ADD COLUMN IF NOT EXISTS at timestamptz,
+  ADD COLUMN IF NOT EXISTS identifier text,
+  ADD COLUMN IF NOT EXISTS ip text,
+  ADD COLUMN IF NOT EXISTS reason text;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'login_attempts'
+      AND column_name = 'created_at'
+  ) THEN
+    UPDATE public.login_attempts SET at = COALESCE(at, created_at) WHERE at IS NULL;
+    ALTER TABLE public.login_attempts ALTER COLUMN created_at SET DEFAULT now();
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'login_attempts'
+      AND column_name = 'email'
+  ) THEN
+    UPDATE public.login_attempts
+    SET identifier = COALESCE(NULLIF(identifier, ''), NULLIF(email, ''))
+    WHERE identifier IS NULL OR btrim(identifier) = '';
+    ALTER TABLE public.login_attempts ALTER COLUMN email DROP NOT NULL;
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'login_attempts'
+      AND column_name = 'ip_address'
+  ) THEN
+    UPDATE public.login_attempts SET ip = COALESCE(ip, ip_address) WHERE ip IS NULL;
+    ALTER TABLE public.login_attempts ALTER COLUMN ip_address DROP NOT NULL;
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'login_attempts'
+      AND column_name = 'failure_reason'
+  ) THEN
+    UPDATE public.login_attempts
+    SET reason = COALESCE(reason, failure_reason)
+    WHERE reason IS NULL;
+    ALTER TABLE public.login_attempts ALTER COLUMN failure_reason DROP NOT NULL;
+  END IF;
+
+  UPDATE public.login_attempts
+  SET identifier = 'legacy:' || id::text
+  WHERE identifier IS NULL OR btrim(identifier) = '';
+  UPDATE public.login_attempts SET at = now() WHERE at IS NULL;
+END
+$$;
+
+ALTER TABLE public.login_attempts
+  ALTER COLUMN at SET DEFAULT now(),
+  ALTER COLUMN at SET NOT NULL,
+  ALTER COLUMN identifier SET NOT NULL;
+
 CREATE INDEX IF NOT EXISTS login_attempts_idx
   ON public.login_attempts (identifier, at DESC);
 CREATE INDEX IF NOT EXISTS login_attempts_ip_idx
   ON public.login_attempts (ip, at DESC);
+CREATE INDEX IF NOT EXISTS login_attempts_rate_limit_idx
+  ON public.login_attempts (identifier, method, at DESC);
+CREATE INDEX IF NOT EXISTS login_attempts_ip_failures_idx
+  ON public.login_attempts (ip, success, at DESC);
 CREATE INDEX IF NOT EXISTS profiles_pending_union_idx
   ON public.profiles (upazila_id, union_id, created_at)
   WHERE status = 'pending';
@@ -694,11 +755,57 @@ CREATE TABLE IF NOT EXISTS public.staff_registration_requests (
 );
 
 ALTER TABLE public.staff_registration_requests
+  ADD COLUMN IF NOT EXISTS phone text,
   ADD COLUMN IF NOT EXISTS email text,
   ADD COLUMN IF NOT EXISTS office_name text,
+  ADD COLUMN IF NOT EXISTS union_name text,
+  ADD COLUMN IF NOT EXISTS upazila_id text DEFAULT 'manirampur',
+  ADD COLUMN IF NOT EXISTS processing_by uuid,
+  ADD COLUMN IF NOT EXISTS processing_at timestamptz,
+  ADD COLUMN IF NOT EXISTS reviewed_by uuid,
+  ADD COLUMN IF NOT EXISTS reviewed_at timestamptz,
   ADD COLUMN IF NOT EXISTS category text,
   ADD COLUMN IF NOT EXISTS requested_position text;
-ALTER TABLE public.staff_registration_requests ALTER COLUMN phone DROP NOT NULL;
+ALTER TABLE public.staff_registration_requests
+  ALTER COLUMN phone DROP NOT NULL;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'staff_registration_requests'
+      AND column_name = 'mobile'
+  ) THEN
+    UPDATE public.staff_registration_requests
+    SET phone = CASE
+      WHEN regexp_replace(mobile, '[^0-9]', '', 'g') ~ '^01[0-9]{9}$'
+        THEN '+88' || regexp_replace(mobile, '[^0-9]', '', 'g')
+      WHEN regexp_replace(mobile, '[^0-9]', '', 'g') ~ '^8801[0-9]{9}$'
+        THEN '+' || regexp_replace(mobile, '[^0-9]', '', 'g')
+      ELSE phone
+    END
+    WHERE phone IS NULL AND mobile IS NOT NULL;
+    ALTER TABLE public.staff_registration_requests ALTER COLUMN mobile DROP NOT NULL;
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'staff_registration_requests'
+      AND column_name = 'admin_area'
+  ) THEN
+    UPDATE public.staff_registration_requests
+    SET union_name = COALESCE(NULLIF(union_name, ''), admin_area)
+    WHERE union_name IS NULL OR union_name = '';
+    ALTER TABLE public.staff_registration_requests ALTER COLUMN admin_area DROP NOT NULL;
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'staff_registration_requests'
+      AND column_name = 'office_name'
+  ) THEN
+    ALTER TABLE public.staff_registration_requests ALTER COLUMN office_name DROP NOT NULL;
+  END IF;
+END
+$$;
 
 UPDATE public.staff_registration_requests
 SET category = CASE
@@ -716,7 +823,10 @@ SET requested_position = 'uno'
 WHERE role = 'uno' AND category = 'উচ্চ পর্যায়ের নির্বাহী প্যানেল'
   AND requested_position IS NULL;
 
-ALTER TABLE public.staff_registration_requests ALTER COLUMN category SET NOT NULL;
+UPDATE public.staff_registration_requests
+SET email = lower(btrim(email))
+WHERE email IS NOT NULL AND email <> lower(btrim(email));
+
 ALTER TABLE public.staff_registration_requests
   DROP CONSTRAINT IF EXISTS staff_registration_requests_status_check,
   DROP CONSTRAINT IF EXISTS staff_registration_requests_role_check,
@@ -725,18 +835,22 @@ ALTER TABLE public.staff_registration_requests
   DROP CONSTRAINT IF EXISTS staff_registration_requests_email_check,
   DROP CONSTRAINT IF EXISTS staff_registration_requests_office_name_check,
   DROP CONSTRAINT IF EXISTS staff_registration_requests_phone_check,
+  DROP CONSTRAINT IF EXISTS staff_registration_requests_mobile_check,
+  DROP CONSTRAINT IF EXISTS staff_registration_requests_admin_area_check,
+  DROP CONSTRAINT IF EXISTS staff_registration_requests_category_not_null,
   ADD CONSTRAINT staff_registration_requests_status_check
-    CHECK (status IN ('pending', 'processing', 'provisioned', 'approved', 'rejected')),
+    CHECK (status IN ('pending', 'processing', 'provisioned', 'approved', 'rejected')) NOT VALID,
   ADD CONSTRAINT staff_registration_requests_role_check
-    CHECK (role IN ('worker', 'police', 'admin', 'uno', 'district', 'super')),
+    CHECK (role IN ('worker', 'police', 'admin', 'uno', 'district', 'super')) NOT VALID,
   ADD CONSTRAINT staff_registration_requests_phone_check
-    CHECK (phone IS NULL OR phone ~ '^\+8801[0-9]{9}$'),
+    CHECK (phone IS NULL OR phone ~ '^\+8801[0-9]{9}$') NOT VALID,
   ADD CONSTRAINT staff_registration_requests_contact_check
-    CHECK (phone IS NOT NULL OR email IS NOT NULL),
+    CHECK (phone IS NOT NULL OR email IS NOT NULL) NOT VALID,
   ADD CONSTRAINT staff_registration_requests_email_check
-    CHECK (email IS NULL OR (email = lower(btrim(email)) AND char_length(email) <= 255)),
+    CHECK (email IS NULL OR (email = lower(btrim(email)) AND char_length(email) <= 255)) NOT VALID,
   ADD CONSTRAINT staff_registration_requests_office_name_check
-    CHECK (office_name IS NULL OR char_length(btrim(office_name)) BETWEEN 1 AND 120),
+    CHECK (office_name IS NULL OR char_length(btrim(office_name)) BETWEEN 1 AND 120) NOT VALID,
+  ADD CONSTRAINT staff_registration_requests_category_not_null CHECK (category IS NOT NULL) NOT VALID,
   ADD CONSTRAINT staff_registration_requests_category_check CHECK (
     (category = 'স্বাস্থ্যকর্মী' AND role = 'worker' AND requested_position IS NULL)
     OR (category = 'গ্রাম পুলিশ' AND role = 'police' AND requested_position IS NULL)
@@ -752,7 +866,7 @@ ALTER TABLE public.staff_registration_requests
         OR (requested_position = 'city_corporation_ceo' AND role = 'admin')
       )
     )
-  );
+  ) NOT VALID;
 
 CREATE UNIQUE INDEX IF NOT EXISTS staff_registration_requests_pending_phone_idx
   ON public.staff_registration_requests (phone)

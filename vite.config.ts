@@ -10,6 +10,31 @@ import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
+  const serverSupabaseEnv = {
+    SUPABASE_URL: env["SUPABASE_URL"] || env["VITE_SUPABASE_URL"],
+    SUPABASE_PUBLISHABLE_KEY:
+      env["SUPABASE_PUBLISHABLE_KEY"] ||
+      env["SUPABASE_ANON_KEY"] ||
+      env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
+      env["VITE_SUPABASE_ANON_KEY"],
+    SUPABASE_SERVICE_ROLE_KEY: env["SUPABASE_SERVICE_ROLE_KEY"],
+  };
+  for (const [name, value] of Object.entries(serverSupabaseEnv)) {
+    if (!process.env[name]?.trim() && value?.trim()) process.env[name] = value;
+  }
+
+  const missingServerSupabaseEnv = [
+    ...(!process.env["SUPABASE_URL"]?.trim() ? ["SUPABASE_URL or VITE_SUPABASE_URL"] : []),
+    ...(!process.env["SUPABASE_PUBLISHABLE_KEY"]?.trim()
+      ? ["SUPABASE_PUBLISHABLE_KEY, SUPABASE_ANON_KEY, or VITE_SUPABASE_* key"]
+      : []),
+  ];
+  if (missingServerSupabaseEnv.length) {
+    console.error("[Supabase] Server configuration is incomplete", {
+      missing: missingServerSupabaseEnv,
+      serviceRoleKeyConfigured: Boolean(process.env["SUPABASE_SERVICE_ROLE_KEY"]?.trim()),
+    });
+  }
   const localDemoAvailable = mode === "development" && !env["SUPABASE_SERVICE_ROLE_KEY"]?.trim();
 
   return {

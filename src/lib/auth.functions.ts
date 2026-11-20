@@ -10,6 +10,7 @@ import {
   origin,
   publicClient,
   recentCount,
+  serializeSupabaseError,
   sha256,
   LIMITS,
 } from "./auth.server";
@@ -39,17 +40,7 @@ async function rolesOf(userId: string) {
 }
 
 function errorDetails(error: unknown) {
-  const details =
-    typeof error === "object" && error !== null ? (error as Record<string, unknown>) : undefined;
-  return {
-    code: typeof details?.["code"] === "string" ? details["code"] : undefined,
-    message:
-      error instanceof Error
-        ? error.message
-        : typeof details?.["message"] === "string"
-          ? details["message"]
-          : "Unknown server error",
-  };
+  return serializeSupabaseError(error);
 }
 
 function missingServerEnvironment(required: string[]) {
@@ -61,8 +52,12 @@ function missingServerEnvironment(required: string[]) {
 }
 
 function isSupabaseConfigurationError(error: unknown) {
-  return /Missing Supabase environment variable\(s\):.*\b(?:SUPABASE_URL|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_PUBLISHABLE_KEY)\b/.test(
-    errorDetails(error).message,
+  const message = errorDetails(error)["message"];
+  return (
+    typeof message === "string" &&
+    /Missing Supabase (?:server )?configuration|Missing Supabase environment variable\(s\):.*\b(?:SUPABASE_URL|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_PUBLISHABLE_KEY)\b/.test(
+      message,
+    )
   );
 }
 
@@ -440,8 +435,9 @@ export const submitStaffRegistrationRequest = createServerFn({ method: "POST" })
           .maybeSingle();
         if (upazilaError) {
           console.error("Could not validate executive registration jurisdiction", {
-            code: upazilaError.code,
-            message: upazilaError.message,
+            table: "upazilas",
+            operation: "select id",
+            error: serializeSupabaseError(upazilaError),
           });
           return { ok: false as const, error: "database" };
         }
@@ -458,8 +454,9 @@ export const submitStaffRegistrationRequest = createServerFn({ method: "POST" })
           .maybeSingle();
         if (upazilaError) {
           console.error("Could not validate staff registration union", {
-            code: upazilaError.code,
-            message: upazilaError.message,
+            table: "upazilas",
+            operation: "select unions",
+            error: serializeSupabaseError(upazilaError),
           });
           return { ok: false as const, error: "database" };
         }
@@ -489,7 +486,7 @@ export const submitStaffRegistrationRequest = createServerFn({ method: "POST" })
         return { ok: false as const, error: "invalid_request" };
       }
 
-      const { error } = await db.from("staff_registration_requests").insert({
+      const { error, status, statusText } = await db.from("staff_registration_requests").insert({
         full_name: data.fullName,
         email,
         phone: mobile,
@@ -502,8 +499,11 @@ export const submitStaffRegistrationRequest = createServerFn({ method: "POST" })
       });
       if (error) {
         console.error("Could not save staff registration request", {
-          code: error.code,
-          message: error.message,
+          table: "staff_registration_requests",
+          operation: "insert",
+          status,
+          statusText,
+          error: serializeSupabaseError(error),
         });
         if (error.code === "23505") {
           await logAttempt(identifier, "staff_registration_request", ip, false, "duplicate");

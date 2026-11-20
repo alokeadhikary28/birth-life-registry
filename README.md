@@ -106,7 +106,10 @@ the current Manirampur staff-registration and approval flow only. It creates
 the required request/profile/role and administrative-area schema and seeds
 Manirampur's 18 unions/municipality; it does not restore case registration,
 monitoring, Storage, or the rest of the application schema. It does not create
-demo staff accounts or authentication users.
+demo staff accounts or authentication users. It also upgrades the older
+`login_attempts` (`email`/`created_at`) and
+`staff_registration_requests` (`mobile`/`admin_area`) column layouts to the
+current server-function schema while retaining those legacy columns.
 
 Before applying the full migration history to a connected project, reconcile
 migration status: `drizzle/migrations/meta/_journal.json` currently ends at

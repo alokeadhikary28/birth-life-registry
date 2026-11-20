@@ -1,42 +1,40 @@
 import { createClient } from "@supabase/supabase-js";
 import { getRequestHeader } from "@tanstack/react-start/server";
 import type { Database } from "@/integrations/supabase/types";
+import {
+  createSupabaseDiagnosticFetch,
+  serializeSupabaseError,
+} from "@/integrations/supabase/server-diagnostics";
+
+export { serializeSupabaseError };
 
 function resolveSupabaseEnv() {
-  const url =
-    process.env["SUPABASE_URL"] ||
-    process.env["VITE_SUPABASE_URL"] ||
-    "";
+  const url = process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"] || "";
   const key =
     process.env["SUPABASE_PUBLISHABLE_KEY"] ||
     process.env["SUPABASE_ANON_KEY"] ||
     process.env["VITE_SUPABASE_ANON_KEY"] ||
-    process.env["SUPABASE_SERVICE_ROLE_KEY"] ||
+    process.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
     "";
 
   if (!url || !key) {
-    console.error("Missing Supabase server env vars", {
+    const missing = [
+      ...(!url ? ["SUPABASE_URL or VITE_SUPABASE_URL"] : []),
+      ...(!key
+        ? [
+            "SUPABASE_PUBLISHABLE_KEY, SUPABASE_ANON_KEY, VITE_SUPABASE_PUBLISHABLE_KEY, or VITE_SUPABASE_ANON_KEY",
+          ]
+        : []),
+    ];
+    console.error("[Supabase] Public server client configuration is incomplete", {
+      missing,
       hasUrl: Boolean(url),
-      hasKey: Boolean(key),
+      hasPublishableKey: Boolean(key),
     });
+    throw new Error(`Missing Supabase server configuration: ${missing.join(", ")}`);
   }
 
   return { url, key };
-}
-
-function serializeError(err: unknown) {
-  if (err instanceof Error) {
-    const anyErr = err as Error & { code?: unknown; details?: unknown; hint?: unknown; cause?: unknown };
-    return {
-      name: err.name,
-      code: anyErr.code ?? undefined,
-      message: err.message,
-      details: anyErr.details,
-      hint: anyErr.hint,
-      cause: anyErr.cause instanceof Error ? anyErr.cause.message : anyErr.cause,
-    };
-  }
-  return { raw: err };
 }
 
 export function publicClient() {
@@ -44,16 +42,14 @@ export function publicClient() {
   return createClient<Database>(url, key, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     global: {
-      fetch: (input, init) => {
+      fetch: createSupabaseDiagnosticFetch((input, init) => {
         const h = new Headers(init?.headers);
-        if (key && key.startsWith("sb_") && h.get("Authorization") === `Bearer ${key}`) {
+        if (key.startsWith("sb_") && h.get("Authorization") === `Bearer ${key}`) {
           h.delete("Authorization");
         }
-        if (key) {
-          h.set("apikey", key);
-        }
+        h.set("apikey", key);
         return fetch(input, { ...init, headers: h });
-      },
+      }),
     },
   });
 }
@@ -61,13 +57,13 @@ export function publicClient() {
 export async function admin() {
   try {
     const mod = await import("@/integrations/supabase/client.server");
-    if (mod?.supabaseAdmin) {
-      return mod.supabaseAdmin;
-    }
+    return mod.supabaseAdmin;
   } catch (err) {
-    console.warn("client.server unavailable, falling back to publicClient()", serializeError(err));
+    console.error("[Supabase] Could not load the server-only admin client", {
+      error: serializeSupabaseError(err),
+    });
+    throw err;
   }
-  return publicClient();
 }
 
 export function clientIp() {
@@ -103,14 +99,15 @@ export async function lockoutMinutes(identifier: string, ip: string) {
         .limit(20),
       db
         .from("login_attempts")
-        .select("id", { count: "exact", head: true })
+        .select("id", { count: "exact" })
         .eq("ip", ip)
         .eq("success", false)
-        .gte("at", since),
+        .gte("at", since)
+        .limit(0),
     ]);
     if (byIdentifier.error || byIp.error) {
       const error = byIdentifier.error ?? byIp.error;
-      console.error("Could not check authentication lockout", serializeError(error));
+      console.error("Could not check authentication lockout", serializeSupabaseError(error));
       throw error;
     }
     const byId = byIdentifier.data;
@@ -128,7 +125,7 @@ export async function lockoutMinutes(identifier: string, ip: string) {
     if ((ipFails ?? 0) >= LIMITS.perIp) return WINDOW_MIN;
     return 0;
   } catch (err) {
-    console.error("Could not check authentication lockout", serializeError(err));
+    console.error("Could not check authentication lockout", serializeSupabaseError(err));
     throw err;
   }
 }
@@ -138,22 +135,21 @@ export async function recentCount(identifier: string, method: string, minutes: n
     const db = await admin();
     const { count, error } = await db
       .from("login_attempts")
-      .select("id", { count: "exact", head: true })
+      .select("id", { count: "exact" })
       .eq("identifier", identifier)
       .eq("method", method)
-      .gte("at", new Date(Date.now() - minutes * 60000).toISOString());
+      .gte("at", new Date(Date.now() - minutes * 60000).toISOString())
+      .limit(0);
     if (error) {
-      console.error("Could not check authentication rate limit", {
-        method,
-        ...serializeError(error),
-      });
       throw error;
     }
     return count ?? 0;
   } catch (err) {
     console.error("Could not check authentication rate limit", {
       method,
-      ...serializeError(err),
+      table: "login_attempts",
+      operation: "count recent attempts",
+      error: serializeSupabaseError(err),
     });
     throw err;
   }
@@ -174,13 +170,17 @@ export async function logAttempt(
     if (error) {
       console.error("Could not record authentication attempt", {
         method,
-        ...serializeError(error),
+        table: "login_attempts",
+        operation: "insert",
+        error: serializeSupabaseError(error),
       });
     }
   } catch (err) {
     console.error("Could not record authentication attempt", {
       method,
-      ...serializeError(err),
+      table: "login_attempts",
+      operation: "insert",
+      error: serializeSupabaseError(err),
     });
   }
 }

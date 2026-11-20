@@ -109,7 +109,11 @@ monitoring, Storage, or the rest of the application schema. It does not create
 demo staff accounts or authentication users. It also upgrades the older
 `login_attempts` (`email`/`created_at`) and
 `staff_registration_requests` (`mobile`/`admin_area`) column layouts to the
-current server-function schema while retaining those legacy columns.
+current server-function schema while retaining those legacy columns, and adds
+missing area-scope columns on existing profiles and administrative catalogs.
+For older `upazilas` tables with `name`/`district_name`, it preserves those
+columns, adds the bilingual fields expected by the app, and backfills them
+without requiring the newer columns to exist beforehand.
 
 Before applying the full migration history to a connected project, reconcile
 migration status: `drizzle/migrations/meta/_journal.json` currently ends at

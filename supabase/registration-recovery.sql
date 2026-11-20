@@ -19,6 +19,8 @@ $$;
 
 CREATE TABLE IF NOT EXISTS public.upazilas (
   id text PRIMARY KEY,
+  name text,
+  district_name text,
   bn text NOT NULL,
   en text NOT NULL,
   district_bn text NOT NULL,
@@ -28,6 +30,34 @@ CREATE TABLE IF NOT EXISTS public.upazilas (
   unions jsonb NOT NULL DEFAULT '[]'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE public.upazilas
+  ADD COLUMN IF NOT EXISTS name text,
+  ADD COLUMN IF NOT EXISTS district_name text,
+  ADD COLUMN IF NOT EXISTS bn text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS en text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS district_bn text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS district_en text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS division_bn text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS division_en text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS unions jsonb NOT NULL DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+
+UPDATE public.upazilas
+SET bn = COALESCE(NULLIF(btrim(bn), ''), NULLIF(btrim(name::text), ''), ''),
+    en = COALESCE(NULLIF(btrim(en), ''), NULLIF(btrim(name::text), ''), ''),
+    district_bn = COALESCE(
+      NULLIF(btrim(district_bn), ''),
+      NULLIF(btrim(district_name::text), ''),
+      ''
+    ),
+    district_en = COALESCE(
+      NULLIF(btrim(district_en), ''),
+      NULLIF(btrim(district_name::text), ''),
+      ''
+    ),
+    division_bn = COALESCE(division_bn, ''),
+    division_en = COALESCE(division_en, '');
 
 GRANT SELECT, INSERT, UPDATE ON public.upazilas TO authenticated;
 GRANT ALL ON public.upazilas TO service_role;
@@ -59,10 +89,21 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   CONSTRAINT profiles_station_matches_union CHECK (station_id IS NOT DISTINCT FROM union_id)
 );
 
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS district_id text;
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS station_id text;
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active';
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS approval_status text NOT NULL DEFAULT 'approved';
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS name_bn text,
+  ADD COLUMN IF NOT EXISTS name_en text,
+  ADD COLUMN IF NOT EXISTS mobile text,
+  ADD COLUMN IF NOT EXISTS email text,
+  ADD COLUMN IF NOT EXISTS upazila_id text REFERENCES public.upazilas(id),
+  ADD COLUMN IF NOT EXISTS union_id text,
+  ADD COLUMN IF NOT EXISTS ward integer,
+  -- Existing legacy profiles stay inactive until explicitly reviewed.
+  ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS district_id text,
+  ADD COLUMN IF NOT EXISTS station_id text,
+  ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active',
+  ADD COLUMN IF NOT EXISTS approval_status text NOT NULL DEFAULT 'approved';
 
 CREATE TABLE IF NOT EXISTS public.user_roles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -183,6 +224,9 @@ CREATE TABLE IF NOT EXISTS public.administrative_areas (
   )
 );
 
+ALTER TABLE public.administrative_areas
+  ADD COLUMN IF NOT EXISTS upazila_id text REFERENCES public.upazilas(id) ON DELETE CASCADE;
+
 CREATE INDEX IF NOT EXISTS administrative_areas_level_parent_idx
   ON public.administrative_areas (level, parent_id);
 CREATE INDEX IF NOT EXISTS administrative_areas_geo_idx
@@ -200,6 +244,11 @@ CREATE TABLE IF NOT EXISTS public.administrative_stations (
   PRIMARY KEY (upazila_id, station_id)
 );
 
+ALTER TABLE public.administrative_stations
+  ADD COLUMN IF NOT EXISTS upazila_id text REFERENCES public.upazilas(id) ON DELETE CASCADE;
+
+CREATE UNIQUE INDEX IF NOT EXISTS administrative_stations_upazila_station_uidx
+  ON public.administrative_stations (upazila_id, station_id);
 CREATE INDEX IF NOT EXISTS administrative_stations_district_idx
   ON public.administrative_stations (district_id, upazila_id, station_type);
 
@@ -277,6 +326,14 @@ DECLARE
 BEGIN
   SELECT * INTO area_row FROM public.upazilas WHERE id = _upazila_id;
   IF NOT FOUND THEN RETURN; END IF;
+  IF NULLIF(btrim(area_row.bn), '') IS NULL
+     OR NULLIF(btrim(area_row.en), '') IS NULL
+     OR NULLIF(btrim(area_row.district_bn), '') IS NULL
+     OR NULLIF(btrim(area_row.district_en), '') IS NULL
+     OR NULLIF(btrim(area_row.division_bn), '') IS NULL
+     OR NULLIF(btrim(area_row.division_en), '') IS NULL THEN
+    RETURN;
+  END IF;
 
   division_area_id := 'division:' || public.administrative_area_slug(area_row.division_en);
   district_area_id := 'district:' || public.administrative_area_slug(area_row.division_en)
@@ -390,6 +447,14 @@ DECLARE
 BEGIN
   SELECT * INTO area_row FROM public.upazilas WHERE id = _upazila_id;
   IF NOT FOUND THEN RETURN; END IF;
+  IF NULLIF(btrim(area_row.bn), '') IS NULL
+     OR NULLIF(btrim(area_row.en), '') IS NULL
+     OR NULLIF(btrim(area_row.district_bn), '') IS NULL
+     OR NULLIF(btrim(area_row.district_en), '') IS NULL
+     OR NULLIF(btrim(area_row.division_bn), '') IS NULL
+     OR NULLIF(btrim(area_row.division_en), '') IS NULL THEN
+    RETURN;
+  END IF;
 
   SELECT district_id INTO district_area_id
   FROM public.administrative_areas
@@ -466,7 +531,8 @@ BEGIN
     ALTER TABLE public.profiles
       ADD CONSTRAINT profiles_station_scope_fkey
       FOREIGN KEY (upazila_id, station_id)
-      REFERENCES public.administrative_stations(upazila_id, station_id);
+      REFERENCES public.administrative_stations(upazila_id, station_id)
+      NOT VALID;
   END IF;
 END
 $$;
@@ -475,10 +541,13 @@ CREATE INDEX IF NOT EXISTS profiles_station_scope_idx
   ON public.profiles (district_id, upazila_id, station_id);
 
 INSERT INTO public.upazilas AS existing_upazila (
-  id, bn, en, district_bn, district_en, division_bn, division_en, unions
+  id, name, district_name, bn, en, district_bn, district_en,
+  division_bn, division_en, unions, created_at
 )
 VALUES (
   'manirampur',
+  'মণিরামপুর',
+  'যশোর',
   'মণিরামপুর',
   'Manirampur',
   'যশোর',
@@ -504,9 +573,12 @@ VALUES (
     {"id":"mn-kultia","bn":"১৫ নং কুলটিয়া","en":"15 No. Kultia","villages":[]},
     {"id":"mn-nehalpur","bn":"১৬ নং নেহালপুর","en":"16 No. Nehalpur","villages":[]},
     {"id":"mn-monoharpur","bn":"১৭ নং মনোহরপুর","en":"17 No. Monoharpur","villages":[]}
-  ]'::jsonb
+  ]'::jsonb,
+  now()
 )
 ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  district_name = EXCLUDED.district_name,
   bn = EXCLUDED.bn,
   en = EXCLUDED.en,
   district_bn = EXCLUDED.district_bn,

@@ -141,19 +141,34 @@ export function ApprovalManagement() {
         },
       });
       if (!result.ok) {
-        toast.error(
-          result.error === "mfa_required"
-            ? L("অনুমোদনের জন্য MFA যাচাই করুন", "Verify MFA to approve this request")
-            : result.error === "request_unavailable"
-              ? L(
-                  "অনুরোধটি ইতিমধ্যে প্রক্রিয়াধীন বা সম্পন্ন হয়েছে",
-                  "This request is already being processed or completed",
-                )
-              : L(
-                  "অ্যাকাউন্ট তৈরি ও সক্রিয় করা যায়নি",
-                  "Could not create and activate the account",
-                ),
-        );
+        if (result.error === "mfa_required") {
+          toast.error(L("অনুমোদনের জন্য MFA যাচাই করুন", "Verify MFA to approve this request"));
+        } else if (result.error === "request_unavailable") {
+          toast.error(
+            L(
+              "অনুরোধটি ইতিমধ্যে প্রক্রিয়াধীন বা সম্পন্ন হয়েছে",
+              "This request is already being processed or completed",
+            ),
+          );
+        } else if (result.error === "password_setup_failed") {
+          toast.error(
+            L(
+              "পাসওয়ার্ড সেটের ইমেইল পাঠানো যায়নি। Supabase email provider ও Redirect URLs পরীক্ষা করুন।",
+              "Password setup email could not be sent. Check the Supabase email provider and Redirect URLs.",
+            ),
+          );
+        } else if (result.error === "request_update_failed") {
+          toast.error(
+            L(
+              "অনুরোধের অবস্থা হালনাগাদ করা যায়নি। তালিকা রিফ্রেশ করে আবার যাচাই করুন।",
+              "Could not finalize the request status. Refresh the list and verify before retrying.",
+            ),
+          );
+        } else {
+          toast.error(
+            L("অ্যাকাউন্ট তৈরি ও সক্রিয় করা যায়নি", "Could not create and activate the account"),
+          );
+        }
         return;
       }
       toast.success(

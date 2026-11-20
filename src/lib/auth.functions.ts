@@ -863,7 +863,10 @@ export const createStaff = createServerFn({ method: "POST" })
       });
     } else if (fieldRole) {
       const phone = normalizePhone(data.contact);
-      if (!phone) return { ok: false as const, error: "bad_phone" };
+      if (!phone) {
+        await restoreRegistrationRequest();
+        return { ok: false as const, error: "bad_phone" };
+      }
       created = await db.auth.admin.createUser({ phone, phone_confirm: true });
     } else {
       const email = z.string().email().safeParse(data.contact.toLowerCase());
@@ -962,7 +965,7 @@ export const createStaff = createServerFn({ method: "POST" })
       }
     }
     if (registrationRequestId) {
-      const { error: requestUpdateError } = await db
+      const { data: approvedRequest, error: requestUpdateError } = await db
         .from("staff_registration_requests")
         .update({
           status: "approved",
@@ -973,8 +976,10 @@ export const createStaff = createServerFn({ method: "POST" })
         })
         .eq("id", registrationRequestId)
         .eq("status", "processing")
-        .eq("processing_by", context.userId);
-      if (requestUpdateError) {
+        .eq("processing_by", context.userId)
+        .select("id")
+        .maybeSingle();
+      if (requestUpdateError || !approvedRequest) {
         const { error: cleanupError } = await db.auth.admin.deleteUser(uid);
         if (cleanupError)
           console.error(
@@ -982,7 +987,11 @@ export const createStaff = createServerFn({ method: "POST" })
             cleanupError.message,
           );
         await restoreRegistrationRequest();
-        console.error("Could not complete staff registration request", requestUpdateError.message);
+        console.error(
+          "Could not complete staff registration request",
+          requestUpdateError?.message ??
+            "The request was no longer in the expected processing state",
+        );
         return { ok: false as const, error: "request_update_failed" };
       }
     }

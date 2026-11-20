@@ -38,10 +38,10 @@ type RegistrationRequest = {
   role: StaffRole;
   category: RegistrationCategory;
   requestedPosition: ExecutivePreviewRole | null;
-  officeName: string | null;
   upazilaId: string;
 
-  unionId: string;
+  unionId: string | null;
+  jurisdictionId: string | null;
   unionName: string;
   createdAt: string;
 };
@@ -51,7 +51,6 @@ function roleName(role: StaffRole, L: (bn: string, en: string) => string) {
   if (role === "police") return L("গ্রাম পুলিশ", "Gram Police");
   if (role === "admin") return L("ইউপি প্রশাসনিক কর্মকর্তা", "UP Administrative Officer");
   return L("উচ্চ পর্যায়ের নির্বাহী প্যানেল", "Higher-Level Executive Panel");
-
 }
 
 export function ApprovalManagement() {
@@ -103,8 +102,9 @@ export function ApprovalManagement() {
                 request.category === "গ্রাম পুলিশ" ||
                 request.category === "ইউপি প্রশাসনিক কর্মকর্তা" ||
                 request.category === "উচ্চ পর্যায়ের নির্বাহী প্যানেল") &&
-
-              typeof request.unionId === "string",
+              (request.category === "উচ্চ পর্যায়ের নির্বাহী প্যানেল"
+                ? typeof request.jurisdictionId === "string"
+                : typeof request.unionId === "string"),
           ),
         );
       }
@@ -134,8 +134,8 @@ export function ApprovalManagement() {
           nameEn: request.fullName,
           contact: request.email ?? request.mobile ?? "",
           upazilaId: request.upazilaId,
-
-          unionId: request.unionId,
+          unionId: request.unionId ?? undefined,
+          jurisdictionId: request.jurisdictionId ?? undefined,
           ward: 1,
           registrationRequestId: request.id,
         },
@@ -166,7 +166,6 @@ export function ApprovalManagement() {
               "অনুরোধ অনুমোদিত; অ্যাকাউন্ট সক্রিয় হয়েছে",
               "Request approved; the account is active",
             ),
-
       );
       if (result.warning === "audit_failed") {
         toast.error(
@@ -302,7 +301,6 @@ export function ApprovalManagement() {
             isSuperAdmin
               ? "There are no pending registration requests"
               : "There are no pending staff registrations in your union",
-
           )}
         </div>
       ) : (
@@ -327,9 +325,6 @@ export function ApprovalManagement() {
                   {" · "}
                   {roleName(request.role, L)} · {request.unionName}
                 </p>
-                {request.officeName && (
-                  <p className="text-sm text-muted-foreground">{request.officeName}</p>
-                )}
                 <p className="break-all text-sm">{request.email ?? request.mobile}</p>
 
                 <p className="mt-1 text-xs text-muted-foreground">

@@ -30,6 +30,56 @@ export const MONIRAMPUR_STATIONS = [
   { id: "mn-monoharpur", bn: "১৭ নং মনোহরপুর", en: "17 No. Monoharpur", type: "union" },
 ] as const satisfies readonly MonirampurStationDefinition[];
 
+function normalizeStationName(name: string) {
+  return name
+    .normalize("NFKC")
+    .toLocaleLowerCase("en")
+    .replace(/[০-৯]/g, (digit) => String("০১২৩৪৫৬৭৮৯".indexOf(digit)))
+    .replace(/^\s*\d+\s*(?:নং|no\.?|number)\s*/i, "")
+    .replace(/য়|য়/g, "য়")
+    .replace(/\b(?:union|municipality|pourashava)\b/gi, "")
+    .replace(/(?:ইউনিয়ন|ইউনিয়ন|পৌরসভা)/g, "")
+    .replace(/[^a-z0-9\u0980-\u09ff]+/g, "");
+}
+
+export function resolveMonirampurStation(
+  unions: unknown,
+  selectedId: string,
+): MonirampurStationDefinition | undefined {
+  const selected = MONIRAMPUR_STATIONS.find((station) => station.id === selectedId);
+  if (!selected || !Array.isArray(unions)) return undefined;
+
+  const selectedNames = new Set([selected.bn, selected.en].map(normalizeStationName));
+  const found = unions.some((union) => {
+    if (typeof union === "string") {
+      return selectedNames.has(normalizeStationName(union));
+    }
+    if (typeof union !== "object" || union === null || Array.isArray(union)) return false;
+
+    if (
+      ("id" in union && union.id === selected.id) ||
+      ("union_id" in union && union.union_id === selected.id) ||
+      ("station_id" in union && union.station_id === selected.id)
+    ) {
+      return true;
+    }
+
+    return Object.values(union).some(
+      (value) => typeof value === "string" && selectedNames.has(normalizeStationName(value)),
+    );
+  });
+
+  return found ? selected : undefined;
+}
+
+export function resolveMonirampurRegistrationUnion(
+  unions: unknown,
+  selectedId: string,
+): MonirampurStationDefinition | undefined {
+  const station = resolveMonirampurStation(unions, selectedId);
+  return station?.type === "union" ? station : undefined;
+}
+
 export function getStationsForUpazila(upazilaId: string, unions: Union[]): Station[] {
   if (upazilaId !== "manirampur") {
     return unions.map((union) => ({

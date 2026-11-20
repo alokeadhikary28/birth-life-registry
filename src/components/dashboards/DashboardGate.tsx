@@ -18,16 +18,25 @@ export function DashboardGate({
   flushViewport?: boolean;
   developmentPreviewRole?: "worker" | "police" | "admin" | "uno";
 }) {
-  const { user, L, authReady, mfa, enterDemoLogin } = useApp();
+  const { user, L, authReady, mfa, demoLoginAvailable, enterDemoLogin } = useApp();
   const [loginOpen, setLoginOpen] = useState(false);
   const startingDevelopmentPreview =
-    import.meta.env.DEV && authReady && !user && Boolean(developmentPreviewRole);
+    demoLoginAvailable &&
+    import.meta.env.DEV &&
+    authReady &&
+    !user &&
+    Boolean(developmentPreviewRole);
 
   useEffect(() => {
     if (startingDevelopmentPreview && developmentPreviewRole) {
       enterDemoLogin(developmentPreviewRole);
     }
   }, [developmentPreviewRole, enterDemoLogin, startingDevelopmentPreview]);
+  useEffect(() => {
+    if (authReady && !user && !startingDevelopmentPreview && !demoLoginAvailable) {
+      setLoginOpen(true);
+    }
+  }, [authReady, demoLoginAvailable, startingDevelopmentPreview, user]);
 
   if (!authReady) {
     return (
@@ -54,7 +63,10 @@ export function DashboardGate({
   if (!user) {
     if (startingDevelopmentPreview) {
       return (
-        <div className="mx-auto w-full max-w-none px-4 py-8 text-center text-muted-foreground" role="status">
+        <div
+          className="mx-auto w-full max-w-none px-4 py-8 text-center text-muted-foreground"
+          role="status"
+        >
           {L("স্থানীয় ডেমো ড্যাশবোর্ড প্রস্তুত হচ্ছে…", "Preparing local demo dashboard…")}
         </div>
       );
@@ -89,8 +101,8 @@ export function DashboardGate({
         flushViewport
           ? "flex h-full min-h-0 w-full max-w-none flex-col"
           : fitViewport
-          ? "mx-auto flex h-full min-h-0 w-full max-w-none flex-col px-4 py-2 sm:px-6 lg:px-8"
-          : "mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8"
+            ? "mx-auto flex h-full min-h-0 w-full max-w-none flex-col px-4 py-2 sm:px-6 lg:px-8"
+            : "mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8"
       }
     >
       {children}

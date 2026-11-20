@@ -1,15 +1,36 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { MAX_IMAGE_BYTES } from "./compress-image";
 import { seedState } from "./seed";
-import type { AppState, CaseDetails, CaseFileMetadata, RegCase, Role, Upazila, User, Village, Union } from "./types";
+import type {
+  AppState,
+  CaseDetails,
+  CaseFileMetadata,
+  RegCase,
+  Role,
+  Upazila,
+  User,
+  Village,
+  Union,
+} from "./types";
 
 type Lang = "bn" | "en";
 export type Mfa = "ok" | "enroll" | "challenge";
 type EpiVisit = Database["public"]["Tables"]["epi_visits"]["Row"];
-type NewEpiVisit = Pick<EpiVisit, "child_name_bn" | "child_name_en" | "parent_mobile" | "village_id">;
+type NewEpiVisit = Pick<
+  EpiVisit,
+  "child_name_bn" | "child_name_en" | "parent_mobile" | "village_id"
+>;
 type UpazilaAnnouncement = {
   upazilaId: string;
   noticeBn: string;
@@ -21,7 +42,9 @@ const localDemoLoginAvailable =
   import.meta.env.DEV &&
   ((typeof __LOCAL_DEMO_AVAILABLE__ === "boolean" && __LOCAL_DEMO_AVAILABLE__) ||
     !import.meta.env["VITE_SUPABASE_URL"] ||
-    !(import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] || import.meta.env["VITE_SUPABASE_ANON_KEY"]));
+    !(
+      import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] || import.meta.env["VITE_SUPABASE_ANON_KEY"]
+    ));
 export const MASTER_APPLICATIONS_KEY = "up_master_applications_v5";
 export const MASTER_APPLICATIONS_UPDATED_EVENT = "up-master-applications-updated";
 const LEGACY_DEMO_CASE_KEYS = [
@@ -110,12 +133,31 @@ function saveDemoAttachmentPreviews(caseId: string, files: File[]) {
 /** Local testing mode: dev server or Lovable preview hosts only (never the published site). */
 const previewTestingAllowed = () =>
   typeof window !== "undefined" &&
-  (import.meta.env.DEV || /^(id-preview--|preview--)|lovableproject(-dev)?\.com$|^localhost$/.test(window.location.hostname));
-type NewCase = Omit<RegCase, "id" | "createdAt" | "synced" | "smsSent" | "remarks" | "status" | "createdBy" | "upazilaId" | "unionId" | "ward" | "files"> & {
+  (import.meta.env.DEV ||
+    /^(id-preview--|preview--)|lovableproject(-dev)?\.com$|^localhost$/.test(
+      window.location.hostname,
+    ));
+type NewCase = Omit<
+  RegCase,
+  | "id"
+  | "createdAt"
+  | "synced"
+  | "smsSent"
+  | "remarks"
+  | "status"
+  | "createdBy"
+  | "upazilaId"
+  | "unionId"
+  | "ward"
+  | "files"
+> & {
   files: File[];
   fileMetadata?: CaseFileMetadata[];
 };
-type CaseCorrection = Pick<RegCase, "type" | "name" | "father" | "mother" | "nid" | "gender" | "dob" | "villageId"> &
+type CaseCorrection = Pick<
+  RegCase,
+  "type" | "name" | "father" | "mother" | "nid" | "gender" | "dob" | "villageId"
+> &
   Pick<RegCase, "parentMobile" | "details"> & {
     order?: string | undefined;
     dod?: string | undefined;
@@ -126,22 +168,44 @@ type CaseCorrection = Pick<RegCase, "type" | "name" | "father" | "mother" | "nid
 const MAX_CASE_FILES = 4;
 
 interface Ctx {
-  state: AppState; user: User | null; authReady: boolean; mfa: Mfa; online: boolean; demoMode: boolean; demoLoginAvailable: boolean;
+  state: AppState;
+  user: User | null;
+  authReady: boolean;
+  mfa: Mfa;
+  online: boolean;
+  demoMode: boolean;
+  demoLoginAvailable: boolean;
   caseLoadError: string | null;
   announcements: UpazilaAnnouncement[];
   selectedUpazilaId: string | undefined;
   setSelectedUpazilaId: (id: string | undefined) => void;
   activeUnionId: string | undefined;
   setActiveUnionId: (id: string | undefined) => void;
-  saveAnnouncement: (upazilaId: string, noticeBn: string, noticeEn: string, active: boolean) => Promise<boolean>;
+  saveAnnouncement: (
+    upazilaId: string,
+    noticeBn: string,
+    noticeEn: string,
+    active: boolean,
+  ) => Promise<boolean>;
   saveUnionVillages: (villages: Village[], unionId?: string) => Promise<boolean>;
-  epiVisits: EpiVisit[]; enterDemoLogin: (role: "worker" | "police" | "admin" | "uno") => void; addEpiVisit: (visit: NewEpiVisit) => Promise<string | null>;
-  lang: Lang; toggleLang: () => void; L: (bn: string, en: string) => string; n: (v: number | string) => string;
-  dark: boolean; toggleTheme: () => void;
-  logout: () => Promise<void>; refresh: () => Promise<void>; refreshAuth: () => Promise<void>;
+  epiVisits: EpiVisit[];
+  enterDemoLogin: (role: "worker" | "police" | "admin" | "uno") => void;
+  addEpiVisit: (visit: NewEpiVisit) => Promise<string | null>;
+  lang: Lang;
+  toggleLang: () => void;
+  L: (bn: string, en: string) => string;
+  n: (v: number | string) => string;
+  dark: boolean;
+  toggleTheme: () => void;
+  logout: () => Promise<void>;
+  refresh: () => Promise<void>;
+  refreshAuth: () => Promise<void>;
   addCase: (c: NewCase) => Promise<string | null>;
   updateCase: (id: string, correction: CaseCorrection) => Promise<boolean>;
-  patchCase: (id: string, patch: { status?: RegCase["status"]; regNo?: string; police?: RegCase["police"] }) => Promise<boolean>;
+  patchCase: (
+    id: string,
+    patch: { status?: RegCase["status"]; regNo?: string; police?: RegCase["police"] },
+  ) => Promise<boolean>;
   addRemark: (id: string, text: string) => Promise<void>;
   addUpazila: (u: Upazila) => Promise<boolean>;
   findVillage: (id: string) => { v: Village; un: Union; up: Upazila } | null;
@@ -150,6 +214,22 @@ const C = createContext<Ctx | null>(null);
 const QUEUE = "uert-offline-queue";
 const UNION_VILLAGES_PREFIX = "birth-life-registry:union-villages:";
 const PRIV: Role[] = ["admin", "uno", "super"];
+const ROLE_PRIORITY: Role[] = ["super", "district", "uno", "admin", "police", "worker"];
+
+function appRoleForDatabaseRole(role: Database["public"]["Enums"]["app_role"]): Role | null {
+  switch (role) {
+    case "worker":
+    case "admin":
+    case "police":
+    case "uno":
+    case "super":
+    case "district":
+      return role;
+    case "super_admin":
+    case "owner":
+      return "super";
+  }
+}
 
 export function readUnionVillageMaster(unionId: string): Village[] | null {
   if (typeof window === "undefined") return null;
@@ -161,7 +241,14 @@ export function readUnionVillageMaster(unionId: string): Village[] | null {
     const villages = parsed.filter((item): item is Village => {
       if (!item || typeof item !== "object") return false;
       const value = item as Partial<Village>;
-      return typeof value.id === "string" && typeof value.bn === "string" && typeof value.en === "string" && typeof value.ward === "number" && typeof value.poBn === "string" && typeof value.poEn === "string";
+      return (
+        typeof value.id === "string" &&
+        typeof value.bn === "string" &&
+        typeof value.en === "string" &&
+        typeof value.ward === "number" &&
+        typeof value.poBn === "string" &&
+        typeof value.poEn === "string"
+      );
     });
     return villages;
   } catch {
@@ -184,7 +271,7 @@ function applyUnionVillageMaster(upazilas: Upazila[], unionId: string): Upazila[
   if (!villages) return upazilas;
   return upazilas.map((upazila) => ({
     ...upazila,
-    unions: upazila.unions.map((union) => union.id === unionId ? { ...union, villages } : union),
+    unions: upazila.unions.map((union) => (union.id === unionId ? { ...union, villages } : union)),
   }));
 }
 
@@ -201,19 +288,37 @@ const empty: AppState = { upazilas: [], users: [], cases: [], audit: [], session
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const mapCase = (r: any, remarks: any[]): RegCase => ({
-  id: r.id, type: r.type,
-  name: { bn: r.name_bn, en: r.name_en }, father: { bn: r.father_bn, en: r.father_en }, mother: { bn: r.mother_bn, en: r.mother_en },
-  nid: r.nid ?? "", parentMobile: r.parent_mobile ?? undefined, gender: r.gender, dob: r.dob, order: r.child_order ?? undefined, dod: r.dod ?? undefined,
+  id: r.id,
+  type: r.type,
+  name: { bn: r.name_bn, en: r.name_en },
+  father: { bn: r.father_bn, en: r.father_en },
+  mother: { bn: r.mother_bn, en: r.mother_en },
+  nid: r.nid ?? "",
+  parentMobile: r.parent_mobile ?? undefined,
+  gender: r.gender,
+  dob: r.dob,
+  order: r.child_order ?? undefined,
+  dod: r.dod ?? undefined,
   cause: r.cause_bn ? { bn: r.cause_bn, en: r.cause_en ?? "" } : undefined,
   details: r.details ?? {},
-  villageId: r.village_id, files: r.files ?? [], filesPurged: r.files_purged,
-  status: r.status, regNo: r.reg_no ?? undefined,
-  remarks: remarks.filter((m) => m.case_id === r.id).map((m) => ({ by: m.author, role: m.role, text: m.text, at: Date.parse(m.created_at) })),
+  villageId: r.village_id,
+  files: r.files ?? [],
+  filesPurged: r.files_purged,
+  status: r.status,
+  regNo: r.reg_no ?? undefined,
+  remarks: remarks
+    .filter((m) => m.case_id === r.id)
+    .map((m) => ({ by: m.author, role: m.role, text: m.text, at: Date.parse(m.created_at) })),
   police: r.police_task ?? undefined,
-  createdBy: r.created_by, upazilaId: r.upazila_id, stationId: r.station_id ?? r.union_id,
-  unionId: r.union_id, ward: r.ward,
-  createdAt: Date.parse(r.created_at), completedAt: r.completed_at ? Date.parse(r.completed_at) : undefined,
-  synced: true, smsSent: r.sms_sent,
+  createdBy: r.created_by,
+  upazilaId: r.upazila_id,
+  stationId: r.station_id ?? r.union_id,
+  unionId: r.union_id,
+  ward: r.ward,
+  createdAt: Date.parse(r.created_at),
+  completedAt: r.completed_at ? Date.parse(r.completed_at) : undefined,
+  synced: true,
+  smsSent: r.sms_sent,
 });
 
 const CASE_DATA_PAGE_SIZE = 1000;
@@ -252,10 +357,14 @@ function isDuplicateCase(existing: RegCase, candidate: NewCase, user: User): boo
   if (existing.type !== candidate.type) return false;
   const nid = candidate.nid.trim();
   if (candidate.type === "death" || nid) {
-    return existing.nid === nid && (candidate.type === "death" || existing.order === candidate.order);
+    return (
+      existing.nid === nid && (candidate.type === "death" || existing.order === candidate.order)
+    );
   }
-  const same = (left: string, right: string) => left.trim().toLocaleLowerCase() === right.trim().toLocaleLowerCase();
-  return existing.upazilaId === user.upazilaId &&
+  const same = (left: string, right: string) =>
+    left.trim().toLocaleLowerCase() === right.trim().toLocaleLowerCase();
+  return (
+    existing.upazilaId === user.upazilaId &&
     existing.unionId === user.unionId &&
     existing.ward === (user.ward ?? 1) &&
     existing.dob === candidate.dob &&
@@ -265,7 +374,8 @@ function isDuplicateCase(existing: RegCase, candidate: NewCase, user: User): boo
     same(existing.father.bn, candidate.father.bn) &&
     same(existing.father.en, candidate.father.en) &&
     same(existing.mother.bn, candidate.mother.bn) &&
-    same(existing.mother.en, candidate.mother.en);
+    same(existing.mother.en, candidate.mother.en)
+  );
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
@@ -288,7 +398,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const prefsReady = useRef(false);
 
   const L = useCallback((bn: string, en: string) => (lang === "bn" ? bn : en), [lang]);
-  const n = useCallback((v: number | string) => lang === "bn" ? String(v).replace(/\d/g, (d) => "০১২৩৪৫৬৭৮৯"[+d]!) : String(v), [lang]);
+  const n = useCallback(
+    (v: number | string) =>
+      lang === "bn" ? String(v).replace(/\d/g, (d) => "০১২৩৪৫৬৭৮৯"[+d]!) : String(v),
+    [lang],
+  );
 
   const enterDemoLogin = useCallback((role: "worker" | "police" | "admin" | "uno") => {
     if (!localDemoLoginAvailable && !previewTestingAllowed()) return;
@@ -311,26 +425,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       throw new Error(`The seeded ${role} account's area is incomplete`);
     }
     const attendedAt = new Date().toISOString();
-    setState(previewUser.unionId ? { ...demo, upazilas: applyUnionVillageMaster(demo.upazilas, previewUser.unionId) } : demo);
+    setState(
+      previewUser.unionId
+        ? { ...demo, upazilas: applyUnionVillageMaster(demo.upazilas, previewUser.unionId) }
+        : demo,
+    );
     setUser(previewUser);
-    if (role === "admin") setActiveUnionId(previewUser.stationId ?? previewUser.unionId ?? "mn-dhakuria");
+    if (role === "admin")
+      setActiveUnionId(previewUser.stationId ?? previewUser.unionId ?? "mn-dhakuria");
     setMfa("ok");
-    setEpiVisits(role === "worker" && union ? [
-      {
-        id: "demo-epi-visit-1",
-        child_name_bn: "মাহিরা আক্তার",
-        child_name_en: "Mahira Akter",
-        parent_mobile: "01711000051",
-        village_id: village.id,
-        upazila_id: upazila.id,
-        union_id: union.id,
-        ward: previewUser.ward ?? 1,
-        attended_at: attendedAt,
-        registration_case_id: null,
-        created_by: previewUser.id,
-        created_at: attendedAt,
-      },
-    ] : []);
+    setEpiVisits(
+      role === "worker" && union
+        ? [
+            {
+              id: "demo-epi-visit-1",
+              child_name_bn: "মাহিরা আক্তার",
+              child_name_en: "Mahira Akter",
+              parent_mobile: "01711000051",
+              village_id: village.id,
+              upazila_id: upazila.id,
+              union_id: union.id,
+              ward: previewUser.ward ?? 1,
+              attended_at: attendedAt,
+              registration_case_id: null,
+              created_by: previewUser.id,
+              created_at: attendedAt,
+            },
+          ]
+        : [],
+    );
     setDemoMode(true);
     setAuthReady(true);
   }, []);
@@ -348,38 +471,43 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ]);
       const loadError = ups.error ?? profs.error ?? roles.error ?? noticeRows.error;
       if (loadError) throw loadError;
-      setAnnouncements((noticeRows.data ?? []).map((notice) => ({
-        upazilaId: notice.upazila_id,
-        noticeBn: notice.notice_bn,
-        noticeEn: notice.notice_en,
-        active: notice.active,
-        updatedAt: Date.parse(notice.updated_at),
-      })));
-      const upazilas: Upazila[] = (ups.data ?? []).map((u) => ({ id: u.id, bn: u.bn, en: u.en, districtBn: u.district_bn, districtEn: u.district_en,
-        divisionBn: u.division_bn, divisionEn: u.division_en, unions: u.unions as unknown as Union[] }));
+      setAnnouncements(
+        (noticeRows.data ?? []).map((notice) => ({
+          upazilaId: notice.upazila_id,
+          noticeBn: notice.notice_bn,
+          noticeEn: notice.notice_en,
+          active: notice.active,
+          updatedAt: Date.parse(notice.updated_at),
+        })),
+      );
+      const upazilas: Upazila[] = (ups.data ?? []).map((u) => ({
+        id: u.id,
+        bn: u.bn,
+        en: u.en,
+        districtBn: u.district_bn,
+        districtEn: u.district_en,
+        divisionBn: u.division_bn,
+        divisionEn: u.division_en,
+        unions: u.unions as unknown as Union[],
+      }));
       const users: User[] = (profs.data ?? []).flatMap((p) => {
-        const role = (roles.data ?? []).find((r) => r.user_id === p.id)?.role;
-        if (
-          role !== undefined &&
-          role !== "worker" &&
-          role !== "admin" &&
-          role !== "police" &&
-          role !== "uno" &&
-          role !== "super" &&
-          role !== "district"
-        ) return [];
-        return [{
-          id: p.id,
-          name: { bn: p.name_bn, en: p.name_en },
-          role: role ?? "worker",
-          active: p.active,
-          mobile: p.mobile ?? undefined,
-          email: p.email ?? undefined,
-          upazilaId: p.upazila_id ?? "",
-          stationId: p.station_id ?? p.union_id ?? undefined,
-          unionId: p.union_id ?? undefined,
-          ward: p.ward ?? undefined,
-        }];
+        const assignedRole = (roles.data ?? []).find((r) => r.user_id === p.id)?.role;
+        const role = assignedRole ? appRoleForDatabaseRole(assignedRole) : null;
+        if (assignedRole !== undefined && !role) return [];
+        return [
+          {
+            id: p.id,
+            name: { bn: p.name_bn, en: p.name_en },
+            role: role ?? "worker",
+            active: p.active,
+            mobile: p.mobile ?? undefined,
+            email: p.email ?? undefined,
+            upazilaId: p.upazila_id ?? "",
+            stationId: p.station_id ?? p.union_id ?? undefined,
+            unionId: p.union_id ?? undefined,
+            ward: p.ward ?? undefined,
+          },
+        ];
       });
       setCaseLoadError(null);
       const upazilasWithSavedVillages = applySavedUnionVillages(upazilas);
@@ -424,25 +552,109 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setAuthReady(true);
       return;
     }
-    const { data: { user: au } } = await supabase.auth.getUser();
-    if (!au) { setUser(null); setState(empty); setAnnouncements([]); setMfa("ok"); setAuthReady(true); return; }
-    const [{ data: p }, { data: r }] = await Promise.all([
+    const {
+      data: { user: au },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError) {
+      console.error("Could not verify the current Supabase session", {
+        message: authError.message,
+      });
+      setUser(null);
+      setState(empty);
+      setAnnouncements([]);
+      setMfa("ok");
+      setAuthReady(true);
+      toast.error(
+        L(
+          "সেশন যাচাই করা যায়নি। আবার লগইন করুন",
+          "Could not verify the session. Please sign in again",
+        ),
+      );
+      return;
+    }
+    if (!au) {
+      setUser(null);
+      setState(empty);
+      setAnnouncements([]);
+      setMfa("ok");
+      setAuthReady(true);
+      return;
+    }
+    const [{ data: p, error: profileError }, { data: r, error: rolesError }] = await Promise.all([
       supabase.from("profiles").select("*").eq("id", au.id).maybeSingle(),
       supabase.from("user_roles").select("role").eq("user_id", au.id),
     ]);
-    if (!p || !r?.length || !p.active) {
+    if (profileError || rolesError) {
+      console.error("Could not load the signed-in staff profile", {
+        profileError: profileError
+          ? { code: profileError.code, message: profileError.message }
+          : undefined,
+        rolesError: rolesError ? { code: rolesError.code, message: rolesError.message } : undefined,
+      });
+      setUser(null);
+      setState(empty);
+      setAnnouncements([]);
+      setMfa("ok");
+      setAuthReady(true);
       toast.error(
-        p?.status === "pending"
-          ? L("Waiting for Approval — আপনার অ্যাকাউন্ট অনুমোদনের অপেক্ষায় আছে।", "Waiting for Approval — your account is awaiting review.")
-          : p?.status === "rejected"
+        L(
+          "প্রোফাইল লোড করা যায়নি। পরে আবার চেষ্টা করুন",
+          "Could not load the profile. Please try again later",
+        ),
+      );
+      return;
+    }
+    if (
+      !p ||
+      !r?.length ||
+      !p.active ||
+      p.status !== "active" ||
+      p.approval_status !== "approved"
+    ) {
+      toast.error(
+        p?.status === "pending" || p?.approval_status === "pending"
+          ? L(
+              "Waiting for Approval — আপনার অ্যাকাউন্ট অনুমোদনের অপেক্ষায় আছে।",
+              "Waiting for Approval — your account is awaiting review.",
+            )
+          : p?.status === "rejected" || p?.approval_status === "rejected"
             ? L("আপনার নিবন্ধন অনুমোদিত হয়নি।", "Your registration was not approved.")
             : L("এই অ্যাকাউন্টের অনুমতি নেই", "This account has no access"),
       );
-      await supabase.auth.signOut(); setUser(null); setAuthReady(true); return;
+      await supabase.auth.signOut();
+      setUser(null);
+      setState(empty);
+      setAnnouncements([]);
+      setMfa("ok");
+      setAuthReady(true);
+      return;
     }
-    const role = r[0]!.role as Role;
-    setUser({ id: au.id, name: { bn: p.name_bn, en: p.name_en }, role, mobile: p.mobile ?? undefined, email: p.email ?? undefined,
-      upazilaId: p.upazila_id ?? "", stationId: p.station_id ?? p.union_id ?? undefined, unionId: p.union_id ?? undefined, ward: p.ward ?? undefined });
+    const assignedRoles = r.flatMap((item) => {
+      const appRole = appRoleForDatabaseRole(item.role);
+      return appRole ? [appRole] : [];
+    });
+    const role = ROLE_PRIORITY.find((candidate) => assignedRoles.includes(candidate));
+    if (!role) {
+      toast.error(L("এই অ্যাকাউন্টের অনুমতি নেই", "This account has no access"));
+      await supabase.auth.signOut();
+      setUser(null);
+      setState(empty);
+      setAuthReady(true);
+      return;
+    }
+    setUser({
+      id: au.id,
+      name: { bn: p.name_bn, en: p.name_en },
+      role,
+      mobile: p.mobile ?? undefined,
+      email: p.email ?? undefined,
+      upazilaId: p.upazila_id ?? "",
+      stationId: p.station_id ?? p.union_id ?? undefined,
+      unionId: p.union_id ?? undefined,
+      ward: p.ward ?? undefined,
+      districtId: p.district_id ?? undefined,
+    });
     let m: Mfa = "ok";
     if (PRIV.includes(role)) {
       const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
@@ -458,11 +670,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setLang((localStorage.getItem("uert-lang") as Lang) || "bn");
       setDark(localStorage.getItem("uert-theme") === "dark");
       setPending(JSON.parse(localStorage.getItem(QUEUE) || "[]"));
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     prefsReady.current = true;
     setOnline(navigator.onLine);
-    const up = () => setOnline(true), down = () => setOnline(false);
-    window.addEventListener("online", up); window.addEventListener("offline", down);
+    const up = () => setOnline(true),
+      down = () => setOnline(false);
+    window.addEventListener("online", up);
+    window.addEventListener("offline", down);
     if (localDemoLoginAvailable) {
       setAuthReady(true);
       return () => {
@@ -471,18 +687,32 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       };
     }
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED" || event === "MFA_CHALLENGE_VERIFIED") {
-        setTimeout(() => { void refreshAuth(); }, 0);
+      if (
+        event === "SIGNED_IN" ||
+        event === "SIGNED_OUT" ||
+        event === "USER_UPDATED" ||
+        event === "MFA_CHALLENGE_VERIFIED"
+      ) {
+        setTimeout(() => {
+          void refreshAuth();
+        }, 0);
       }
     });
     void refreshAuth();
-    return () => { window.removeEventListener("online", up); window.removeEventListener("offline", down); sub.subscription.unsubscribe(); };
+    return () => {
+      window.removeEventListener("online", up);
+      window.removeEventListener("offline", down);
+      sub.subscription.unsubscribe();
+    };
   }, [refreshAuth]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
     document.documentElement.lang = lang;
-    if (prefsReady.current) { localStorage.setItem("uert-theme", dark ? "dark" : "light"); localStorage.setItem("uert-lang", lang); }
+    if (prefsReady.current) {
+      localStorage.setItem("uert-theme", dark ? "dark" : "light");
+      localStorage.setItem("uert-lang", lang);
+    }
   }, [dark, lang]);
   useEffect(() => {
     if (!user) {
@@ -496,7 +726,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           .find((upazila) => upazila.id === "manirampur")
           ?.unions.some((union) => union.id === "mn-dhakuria")
           ? "mn-dhakuria"
-          : user.stationId ?? user.unionId;
+          : (user.stationId ?? user.unionId);
         return defaultUnion;
       });
     }
@@ -547,7 +777,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const channel = supabase
       .channel(`live-registration-cases-${user.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "cases" }, refreshLiveCases)
-      .on("postgres_changes", { event: "*", schema: "public", table: "case_remarks" }, refreshLiveCases)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "case_remarks" },
+        refreshLiveCases,
+      )
       .subscribe((status) => {
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
           console.error("Live registration case subscription failed", status);
@@ -559,12 +793,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       void supabase.removeChannel(channel);
     };
   }, [L, authReady, demoMode, mfa, refreshCases, user]);
-  useEffect(() => { if (prefsReady.current) localStorage.setItem(QUEUE, JSON.stringify(pending)); }, [pending]);
+  useEffect(() => {
+    if (prefsReady.current) localStorage.setItem(QUEUE, JSON.stringify(pending));
+  }, [pending]);
 
   // Explicitly submitted offline cases are synced when their owning account reconnects.
   useEffect(() => {
-    if (demoMode || !online || !user || (user.role !== "worker" && user.role !== "police") || !pending.length) return;
-    const signature = `${user.id}:${pending.map((row) => String(row.id)).sort().join(",")}`;
+    if (
+      demoMode ||
+      !online ||
+      !user ||
+      (user.role !== "worker" && user.role !== "police") ||
+      !pending.length
+    )
+      return;
+    const signature = `${user.id}:${pending
+      .map((row) => String(row.id))
+      .sort()
+      .join(",")}`;
     if (syncingOfflineQueue.current || syncAttemptSignature.current === signature) return;
     syncAttemptSignature.current = signature;
     syncingOfflineQueue.current = true;
@@ -589,62 +835,139 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         syncingOfflineQueue.current = false;
       }
       if (synced || left.length !== pending.length) {
-        syncAttemptSignature.current =
-          `${user.id}:${left.map((row) => String(row.id)).sort().join(",")}`;
+        syncAttemptSignature.current = `${user.id}:${left
+          .map((row) => String(row.id))
+          .sort()
+          .join(",")}`;
         setPending(left);
       }
       if (synced) {
-        toast.success(L(`${n(synced)}টি অফলাইন এন্ট্রি সিঙ্ক হয়েছে`, `${synced} offline entries synced`));
+        toast.success(
+          L(`${n(synced)}টি অফলাইন এন্ট্রি সিঙ্ক হয়েছে`, `${synced} offline entries synced`),
+        );
         void loadData();
       }
       if (firstSyncError) {
         console.error("Some offline applications could not be synced", firstSyncError);
         toast.error(
-          L("কিছু অফলাইন আবেদন সিঙ্ক হয়নি। সংযোগ যাচাই করে পরে আবার চেষ্টা করুন।", "Some offline applications were not synced. Check the connection and try again later."),
+          L(
+            "কিছু অফলাইন আবেদন সিঙ্ক হয়নি। সংযোগ যাচাই করে পরে আবার চেষ্টা করুন।",
+            "Some offline applications were not synced. Check the connection and try again later.",
+          ),
         );
       }
     })();
   }, [demoMode, online, user, pending, L, n, loadData]);
 
-  const findVillage = useCallback((id: string) => {
-    for (const up of state.upazilas) for (const un of up.unions) {
-      const v = un.villages.find((x) => x.id === id); if (v) return { v, un, up };
-    }
-    return null;
-  }, [state.upazilas]);
+  const findVillage = useCallback(
+    (id: string) => {
+      for (const up of state.upazilas)
+        for (const un of up.unions) {
+          const v = un.villages.find((x) => x.id === id);
+          if (v) return { v, un, up };
+        }
+      return null;
+    },
+    [state.upazilas],
+  );
 
-  const dupMsg = (t: string) => t === "birth"
-    ? L("এই শিশু ও জন্মতারিখের তথ্য আগেই জমা হয়েছে", "This child and date of birth have already been submitted")
-    : L("এই NID/জন্ম নিবন্ধন নম্বরে মৃত্যু নিবন্ধন আগেই হয়েছে", "A death with this NID/birth certificate number already exists");
+  const dupMsg = (t: string) =>
+    t === "birth"
+      ? L(
+          "এই শিশু ও জন্মতারিখের তথ্য আগেই জমা হয়েছে",
+          "This child and date of birth have already been submitted",
+        )
+      : L(
+          "এই NID/জন্ম নিবন্ধন নম্বরে মৃত্যু নিবন্ধন আগেই হয়েছে",
+          "A death with this NID/birth certificate number already exists",
+        );
 
   const value: Ctx = {
     caseLoadError,
-    state: { ...state, cases: [...pending.filter((p) => p.created_by === user?.id).map((p) => ({ ...mapCase({ ...p, created_at: p.queued_at, files: [], files_purged: false, status: "pending", sms_sent: false }, []), synced: false })), ...state.cases] },
-    user, authReady, mfa, online, lang, L, n, dark, demoMode, demoLoginAvailable: localDemoLoginAvailable, epiVisits,
-    announcements, selectedUpazilaId, setSelectedUpazilaId, activeUnionId, setActiveUnionId,
+    state: {
+      ...state,
+      cases: [
+        ...pending
+          .filter((p) => p.created_by === user?.id)
+          .map((p) => ({
+            ...mapCase(
+              {
+                ...p,
+                created_at: p.queued_at,
+                files: [],
+                files_purged: false,
+                status: "pending",
+                sms_sent: false,
+              },
+              [],
+            ),
+            synced: false,
+          })),
+        ...state.cases,
+      ],
+    },
+    user,
+    authReady,
+    mfa,
+    online,
+    lang,
+    L,
+    n,
+    dark,
+    demoMode,
+    demoLoginAvailable: localDemoLoginAvailable,
+    epiVisits,
+    announcements,
+    selectedUpazilaId,
+    setSelectedUpazilaId,
+    activeUnionId,
+    setActiveUnionId,
     saveAnnouncement: async (upazilaId, noticeBn, noticeEn, active) => {
       if (!user || user.role !== "uno" || user.upazilaId !== upazilaId) {
-        toast.error(L("শুধু নিজ উপজেলার ইউএনও বিজ্ঞপ্তি প্রকাশ করতে পারবেন", "Only the assigned Upazila UNO can publish this notice"));
+        toast.error(
+          L(
+            "শুধু নিজ উপজেলার ইউএনও বিজ্ঞপ্তি প্রকাশ করতে পারবেন",
+            "Only the assigned Upazila UNO can publish this notice",
+          ),
+        );
         return false;
       }
-      if (noticeBn.length > 500 || noticeEn.length > 500 || (active && !noticeBn.trim() && !noticeEn.trim())) {
-        toast.error(L("বিজ্ঞপ্তি ৫০০ অক্ষরের মধ্যে এবং সক্রিয় থাকলে খালি হতে পারবে না", "Notices must be 500 characters or fewer and cannot be empty when active"));
+      if (
+        noticeBn.length > 500 ||
+        noticeEn.length > 500 ||
+        (active && !noticeBn.trim() && !noticeEn.trim())
+      ) {
+        toast.error(
+          L(
+            "বিজ্ঞপ্তি ৫০০ অক্ষরের মধ্যে এবং সক্রিয় থাকলে খালি হতে পারবে না",
+            "Notices must be 500 characters or fewer and cannot be empty when active",
+          ),
+        );
         return false;
       }
       if (demoMode) {
         setAnnouncements((current) => [
           ...current.filter((notice) => notice.upazilaId !== upazilaId),
-          { upazilaId, noticeBn: noticeBn.trim(), noticeEn: noticeEn.trim(), active, updatedAt: Date.now() },
+          {
+            upazilaId,
+            noticeBn: noticeBn.trim(),
+            noticeEn: noticeEn.trim(),
+            active,
+            updatedAt: Date.now(),
+          },
         ]);
         return true;
       }
-      const { error } = await supabase.from("upazila_announcements").upsert({
-        upazila_id: upazilaId,
-        notice_bn: noticeBn.trim(),
-        notice_en: noticeEn.trim(),
-        active,
-        updated_by: user.id,
-      }, { onConflict: "upazila_id" });
+      const { error } = await supabase.from("upazila_announcements").upsert(
+        {
+          upazila_id: upazilaId,
+          notice_bn: noticeBn.trim(),
+          notice_en: noticeEn.trim(),
+          active,
+          updated_by: user.id,
+        },
+        { onConflict: "upazila_id" },
+      );
       if (error) {
         toast.error(error.message);
         return false;
@@ -654,26 +977,40 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     saveUnionVillages: async (villages, targetUnionId = activeUnionId ?? user?.unionId) => {
       if (!user || user.role !== "admin" || !targetUnionId || mfa !== "ok") {
-        toast.error(L("শুধু নির্ধারিত ইউপি প্রশাসনিক কর্মকর্তা গ্রাম-ওয়ার্ডের তথ্য পরিবর্তন করতে পারবেন", "Only the assigned UP Administrative Officer can manage village and ward details"));
+        toast.error(
+          L(
+            "শুধু নির্ধারিত ইউপি প্রশাসনিক কর্মকর্তা গ্রাম-ওয়ার্ডের তথ্য পরিবর্তন করতে পারবেন",
+            "Only the assigned UP Administrative Officer can manage village and ward details",
+          ),
+        );
         return false;
       }
       if (
         villages.length > 500 ||
-        villages.some((village) =>
-          !village.id.trim() ||
-          !village.bn.trim() ||
-          !village.en.trim() ||
-          !Number.isInteger(village.ward) ||
-          village.ward < 1 ||
-          village.ward > 99
+        villages.some(
+          (village) =>
+            !village.id.trim() ||
+            !village.bn.trim() ||
+            !village.en.trim() ||
+            !Number.isInteger(village.ward) ||
+            village.ward < 1 ||
+            village.ward > 99,
         ) ||
         new Set(villages.map((village) => village.id)).size !== villages.length
       ) {
-        toast.error(L("প্রতিটি গ্রামের বাংলা/ইংরেজি নাম, ১–৯৯ ওয়ার্ড এবং স্বতন্ত্র পরিচয় দিন", "Provide each village's Bangla/English names, a ward from 1 to 99, and a unique ID"));
+        toast.error(
+          L(
+            "প্রতিটি গ্রামের বাংলা/ইংরেজি নাম, ১–৯৯ ওয়ার্ড এবং স্বতন্ত্র পরিচয় দিন",
+            "Provide each village's Bangla/English names, a ward from 1 to 99, and a unique ID",
+          ),
+        );
         return false;
       }
       try {
-        window.localStorage.setItem(`${UNION_VILLAGES_PREFIX}${targetUnionId}`, JSON.stringify(villages));
+        window.localStorage.setItem(
+          `${UNION_VILLAGES_PREFIX}${targetUnionId}`,
+          JSON.stringify(villages),
+        );
       } catch (cause) {
         console.error("Could not persist union village master setup", cause);
       }
@@ -714,7 +1051,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     enterDemoLogin,
     toggleLang: () => setLang((l) => (l === "bn" ? "en" : "bn")),
     toggleTheme: () => setDark((d) => !d),
-    refresh: loadData, refreshAuth,
+    refresh: loadData,
+    refreshAuth,
     logout: async () => {
       if (demoMode) {
         setDemoMode(false);
@@ -725,11 +1063,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setAuthReady(true);
         return;
       }
-      await supabase.auth.signOut(); setUser(null); setState(empty); setAnnouncements([]);
+      await supabase.auth.signOut();
+      setUser(null);
+      setState(empty);
+      setAnnouncements([]);
     },
     addCase: async (c) => {
       if (!user || (user.role !== "worker" && user.role !== "police")) {
-        return L("শুধু স্বাস্থ্যকর্মী বা গ্রাম পুলিশ তথ্য দিতে পারবেন", "Only health workers or village police may enter data");
+        return L(
+          "শুধু স্বাস্থ্যকর্মী বা গ্রাম পুলিশ তথ্য দিতে পারবেন",
+          "Only health workers or village police may enter data",
+        );
       }
       if (c.files.length > MAX_CASE_FILES) {
         return L("সর্বোচ্চ ৪টি ছবি সংযুক্ত করা যাবে", "You can attach up to 4 photos");
@@ -740,7 +1084,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const id = crypto.randomUUID();
       const stationId = user.stationId ?? user.unionId;
       if (!stationId || stationId !== user.unionId) {
-        return L("আপনার নির্ধারিত স্টেশন সঠিকভাবে সেট করা নেই", "Your assigned station is not configured correctly");
+        return L(
+          "আপনার নির্ধারিত স্টেশন সঠিকভাবে সেট করা নেই",
+          "Your assigned station is not configured correctly",
+        );
       }
       if (demoMode) {
         if (state.cases.some((existing) => isDuplicateCase(existing, c, user))) {
@@ -779,7 +1126,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             current.map((visit) =>
               !visit.registration_case_id &&
               visit.parent_mobile === localCase.parentMobile &&
-              (visit.child_name_bn === localCase.name.bn || visit.child_name_en.toLocaleLowerCase() === localCase.name.en.toLocaleLowerCase())
+              (visit.child_name_bn === localCase.name.bn ||
+                visit.child_name_en.toLocaleLowerCase() === localCase.name.en.toLocaleLowerCase())
                 ? { ...visit, registration_case_id: id }
                 : visit,
             ),
@@ -788,14 +1136,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return null;
       }
       const row: any = {
-        id, client_id: id, type: c.type, name_bn: c.name.bn, name_en: c.name.en, father_bn: c.father.bn, father_en: c.father.en,
-        mother_bn: c.mother.bn, mother_en: c.mother.en, nid: c.nid.trim() || null, gender: c.gender, dob: c.dob, child_order: c.order ?? null,
-        parent_mobile: c.parentMobile ?? null, dod: c.dod ?? null, cause_bn: c.cause?.bn ?? null, cause_en: c.cause?.en ?? null, village_id: c.villageId, details: c.details ?? {},
-        created_by: user.id, upazila_id: user.upazilaId, station_id: stationId, union_id: user.unionId, ward: user.ward ?? 1,
+        id,
+        client_id: id,
+        type: c.type,
+        name_bn: c.name.bn,
+        name_en: c.name.en,
+        father_bn: c.father.bn,
+        father_en: c.father.en,
+        mother_bn: c.mother.bn,
+        mother_en: c.mother.en,
+        nid: c.nid.trim() || null,
+        gender: c.gender,
+        dob: c.dob,
+        child_order: c.order ?? null,
+        parent_mobile: c.parentMobile ?? null,
+        dod: c.dod ?? null,
+        cause_bn: c.cause?.bn ?? null,
+        cause_en: c.cause?.en ?? null,
+        village_id: c.villageId,
+        details: c.details ?? {},
+        created_by: user.id,
+        upazila_id: user.upazilaId,
+        station_id: stationId,
+        union_id: user.unionId,
+        ward: user.ward ?? 1,
       };
       if (state.cases.some((existing) => isDuplicateCase(existing, c, user))) return dupMsg(c.type);
       if (!navigator.onLine) {
-        if (c.files.length) return L("অফলাইনে ফাইল যুক্ত করা যায় না — ফাইল ছাড়া জমা দিন বা অনলাইনে আসুন", "Files can't be attached offline — submit without files or reconnect");
+        if (c.files.length)
+          return L(
+            "অফলাইনে ফাইল যুক্ত করা যায় না — ফাইল ছাড়া জমা দিন বা অনলাইনে আসুন",
+            "Files can't be attached offline — submit without files or reconnect",
+          );
         setPending((p) => [...p, { ...row, queued_at: new Date().toISOString() }]);
         return null;
       }
@@ -808,7 +1180,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       for (const [index, f] of c.files.slice(0, MAX_CASE_FILES).entries()) {
         const safe = f.name.replace(/[^\w.-]+/g, "_").slice(-80);
         const path = `${user.upazilaId}/${user.unionId}/${id}/${Date.now()}-${crypto.randomUUID()}-${safe}`;
-        const { error } = await supabase.storage.from("case-files").upload(path, f, { contentType: f.type });
+        const { error } = await supabase.storage
+          .from("case-files")
+          .upload(path, f, { contentType: f.type });
         if (error) return L("ফাইল আপলোড ব্যর্থ", "File upload failed") + `: ${error.message}`;
         files.push({ name: f.name, size: f.size, path, ...c.fileMetadata?.[index] });
       }
@@ -831,19 +1205,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         toast.error(L("সর্বোচ্চ ৪টি ছবি সংযুক্ত করা যাবে", "You can attach up to 4 photos"));
         return false;
       }
-      if (correction.files?.some((file) => !file.type.startsWith("image/") || file.size > MAX_IMAGE_BYTES)) {
-        toast.error(L("প্রতিটি ছবি ৭৫০ KB-এর মধ্যে হতে হবে", "Each image must be 750 KB or smaller"));
+      if (
+        correction.files?.some(
+          (file) => !file.type.startsWith("image/") || file.size > MAX_IMAGE_BYTES,
+        )
+      ) {
+        toast.error(
+          L("প্রতিটি ছবি ৭৫০ KB-এর মধ্যে হতে হবে", "Each image must be 750 KB or smaller"),
+        );
         return false;
       }
       const existing = state.cases.find((item) => item.id === id);
-      const canCorrect = !!existing && (
-        user.role === "worker"
+      const canCorrect =
+        !!existing &&
+        (user.role === "worker"
           ? existing.createdBy === user.id
           : existing.upazilaId === user.upazilaId &&
             existing.unionId === user.unionId &&
-            existing.ward === user.ward
-      );
-      if (!existing || !canCorrect || existing.status === "completed" || existing.status === "rejected") {
+            existing.ward === user.ward);
+      if (
+        !existing ||
+        !canCorrect ||
+        existing.status === "completed" ||
+        existing.status === "rejected"
+      ) {
         toast.error(L("এই এন্ট্রি আর সংশোধন করা যাবে না", "This entry can no longer be corrected"));
         return false;
       }
@@ -855,7 +1240,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const correctedCase = { ...correction, details: correctedDetails };
 
       if (demoMode) {
-        if (state.cases.some((item) => item.id !== id && item.type === correctedCase.type && item.nid === correctedCase.nid && (correctedCase.type === "death" || item.order === correctedCase.order))) {
+        if (
+          state.cases.some(
+            (item) =>
+              item.id !== id &&
+              item.type === correctedCase.type &&
+              item.nid === correctedCase.nid &&
+              (correctedCase.type === "death" || item.order === correctedCase.order),
+          )
+        ) {
           toast.error(dupMsg(correction.type));
           return false;
         }
@@ -874,14 +1267,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (correction.files) saveDemoAttachmentPreviews(id, correction.files);
         setState((current) => ({
           ...current,
-          cases: current.cases.map((item) => item.id === id ? updatedCase : item),
+          cases: current.cases.map((item) => (item.id === id ? updatedCase : item)),
         }));
         if (updatedCase.type === "birth" && updatedCase.parentMobile) {
           setEpiVisits((current) =>
             current.map((visit) =>
               !visit.registration_case_id &&
               visit.parent_mobile === updatedCase.parentMobile &&
-              (visit.child_name_bn === updatedCase.name.bn || visit.child_name_en.toLocaleLowerCase() === updatedCase.name.en.toLocaleLowerCase())
+              (visit.child_name_bn === updatedCase.name.bn ||
+                visit.child_name_en.toLocaleLowerCase() === updatedCase.name.en.toLocaleLowerCase())
                 ? { ...visit, registration_case_id: id }
                 : visit,
             ),
@@ -899,13 +1293,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       for (const [index, file] of (correction.files ?? []).slice(0, MAX_CASE_FILES).entries()) {
         const safe = file.name.replace(/[^\w.-]+/g, "_").slice(-80);
         const path = `${user.upazilaId}/${user.unionId}/${id}/${Date.now()}-${crypto.randomUUID()}-${safe}`;
-        const { error } = await supabase.storage.from("case-files").upload(path, file, { contentType: file.type });
+        const { error } = await supabase.storage
+          .from("case-files")
+          .upload(path, file, { contentType: file.type });
         if (error) {
-          if (uploads.length) await supabase.storage.from("case-files").remove(uploads.map((item) => item.path));
+          if (uploads.length)
+            await supabase.storage.from("case-files").remove(uploads.map((item) => item.path));
           toast.error(L("ফাইল আপলোড ব্যর্থ", "File upload failed") + `: ${error.message}`);
           return false;
         }
-        uploads.push({ name: file.name, size: file.size, path, ...correction.fileMetadata?.[index] });
+        uploads.push({
+          name: file.name,
+          size: file.size,
+          path,
+          ...correction.fileMetadata?.[index],
+        });
       }
 
       const update: Database["public"]["Tables"]["cases"]["Update"] = {
@@ -928,17 +1330,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         details: JSON.parse(JSON.stringify(correctedDetails)) as Json,
       };
       if (correction.files) update.files = uploads;
-      const { data, error } = await supabase.from("cases").update(update).eq("id", id).select("id").maybeSingle();
+      const { data, error } = await supabase
+        .from("cases")
+        .update(update)
+        .eq("id", id)
+        .select("id")
+        .maybeSingle();
       if (error || !data) {
-        if (uploads.length) await supabase.storage.from("case-files").remove(uploads.map((item) => item.path));
-        toast.error(error?.message ?? L("এন্ট্রি সংশোধন করা যায়নি", "Could not update this entry"));
+        if (uploads.length)
+          await supabase.storage.from("case-files").remove(uploads.map((item) => item.path));
+        toast.error(
+          error?.message ?? L("এন্ট্রি সংশোধন করা যায়নি", "Could not update this entry"),
+        );
         return false;
       }
       if (correction.files) {
-        const oldPaths = existing.files.flatMap((item) => item.path ? [item.path] : []);
+        const oldPaths = existing.files.flatMap((item) => (item.path ? [item.path] : []));
         if (oldPaths.length) {
           const { error: removeError } = await supabase.storage.from("case-files").remove(oldPaths);
-          if (removeError) toast.error(L("পুরোনো সংযুক্তি মুছে ফেলা যায়নি", "Could not remove previous attachments") + `: ${removeError.message}`);
+          if (removeError)
+            toast.error(
+              L("পুরোনো সংযুক্তি মুছে ফেলা যায়নি", "Could not remove previous attachments") +
+                `: ${removeError.message}`,
+            );
         }
       }
       await loadData();
@@ -946,12 +1360,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     addEpiVisit: async (visit) => {
       if (!user || user.role !== "worker") {
-        return L("শুধু স্বাস্থ্যকর্মী EPI উপস্থিতি দিতে পারবেন", "Only health workers can record EPI attendance");
+        return L(
+          "শুধু স্বাস্থ্যকর্মী EPI উপস্থিতি দিতে পারবেন",
+          "Only health workers can record EPI attendance",
+        );
       }
       const upazila = state.upazilas.find((area) => area.id === user.upazilaId);
       const union = upazila?.unions.find((area) => area.id === user.unionId);
       if (!upazila || !union?.villages.some((village) => village.id === visit.village_id)) {
-        return L("নির্বাচিত গ্রাম নির্ধারিত এলাকার মধ্যে নেই", "Selected village is outside the assigned area");
+        return L(
+          "নির্বাচিত গ্রাম নির্ধারিত এলাকার মধ্যে নেই",
+          "Selected village is outside the assigned area",
+        );
       }
       if (demoMode) {
         const timestamp = new Date().toISOString();
@@ -985,11 +1405,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (!state.cases.some((item) => item.id === id)) return false;
         setState((current) => ({
           ...current,
-          cases: current.cases.map((item) => item.id === id ? {
-            ...item,
-            ...patch,
-            completedAt: patch.status === undefined ? item.completedAt : patch.status === "completed" ? Date.now() : undefined,
-          } : item),
+          cases: current.cases.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  ...patch,
+                  completedAt:
+                    patch.status === undefined
+                      ? item.completedAt
+                      : patch.status === "completed"
+                        ? Date.now()
+                        : undefined,
+                }
+              : item,
+          ),
         }));
         return true;
       }
@@ -997,28 +1426,49 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (patch.status) upd.status = patch.status;
       if (patch.regNo !== undefined) upd.reg_no = patch.regNo;
       if (patch.police !== undefined) upd.police_task = patch.police;
-      const { data, error } = await supabase.from("cases").update(upd).eq("id", id).select("id").maybeSingle();
-      if (error) { toast.error(error.message); return false; }
-      if (!data) {
-        toast.error(L("আবেদনের অবস্থা হালনাগাদ করা যায়নি", "Could not update the application status"));
+      const { data, error } = await supabase
+        .from("cases")
+        .update(upd)
+        .eq("id", id)
+        .select("id")
+        .maybeSingle();
+      if (error) {
+        toast.error(error.message);
         return false;
       }
-      await loadData(); return true;
+      if (!data) {
+        toast.error(
+          L("আবেদনের অবস্থা হালনাগাদ করা যায়নি", "Could not update the application status"),
+        );
+        return false;
+      }
+      await loadData();
+      return true;
     },
     addRemark: async (id, text) => {
       if (!user) return;
       if (demoMode) {
         setState((current) => ({
           ...current,
-          cases: current.cases.map((item) => item.id === id ? {
-            ...item,
-            remarks: [...item.remarks, { by: user.name.bn, role: user.role, text, at: Date.now() }],
-          } : item),
+          cases: current.cases.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  remarks: [
+                    ...item.remarks,
+                    { by: user.name.bn, role: user.role, text, at: Date.now() },
+                  ],
+                }
+              : item,
+          ),
         }));
         return;
       }
-      const { error } = await supabase.from("case_remarks").insert({ case_id: id, role: user.role, text, author: user.id });
-      if (error) toast.error(error.message); else await loadData();
+      const { error } = await supabase
+        .from("case_remarks")
+        .insert({ case_id: id, role: user.role, text, author: user.id });
+      if (error) toast.error(error.message);
+      else await loadData();
     },
     addUpazila: async (u) => {
       if (demoMode) {
@@ -1026,10 +1476,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setState((current) => ({ ...current, upazilas: [...current.upazilas, u] }));
         return true;
       }
-      const { error } = await supabase.from("upazilas").insert({ id: u.id, bn: u.bn, en: u.en, district_bn: u.districtBn, district_en: u.districtEn,
-        division_bn: u.divisionBn, division_en: u.divisionEn, unions: u.unions as any });
-      if (error) { toast.error(error.message); return false; }
-      await loadData(); return true;
+      const { error } = await supabase.from("upazilas").insert({
+        id: u.id,
+        bn: u.bn,
+        en: u.en,
+        district_bn: u.districtBn,
+        district_en: u.districtEn,
+        division_bn: u.divisionBn,
+        division_en: u.divisionEn,
+        unions: u.unions as any,
+      });
+      if (error) {
+        toast.error(error.message);
+        return false;
+      }
+      await loadData();
+      return true;
     },
     findVillage,
   };
@@ -1037,7 +1499,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 }
 
 export function useApp() {
-  const c = useContext(C); if (!c) throw new Error("StoreProvider missing"); return c;
+  const c = useContext(C);
+  if (!c) throw new Error("StoreProvider missing");
+  return c;
 }
 
 /** Client-side mirror of the database's row-level isolation rules. */
@@ -1058,23 +1522,26 @@ export function scopedCases(state: AppState, u: User | null) {
     if (u.role === "uno") return true;
     const assignedStationId = u.stationId ?? u.unionId;
     const caseStationId = c.stationId ?? c.unionId;
-    if (!assignedStationId || caseStationId !== assignedStationId || c.unionId !== u.unionId) return false;
+    if (!assignedStationId || caseStationId !== assignedStationId || c.unionId !== u.unionId)
+      return false;
     if (u.role === "admin") return true;
     if (u.role === "police") {
-      return c.ward === u.ward && (
-        c.createdBy === u.id ||
-        c.police?.assignedPoliceId === u.id ||
-        (!!c.police && !c.police.assignedPoliceId)
+      return (
+        c.ward === u.ward &&
+        (c.createdBy === u.id ||
+          c.police?.assignedPoliceId === u.id ||
+          (!!c.police && !c.police.assignedPoliceId))
       );
     }
     return c.createdBy === u.id;
   });
 }
 
-export const roleLabel = (r: string, L: (b: string, e: string) => string) => ({
-  worker: L("ইপিআই / স্বাস্থ্যকর্মী", "EPI / Health Worker"),
-  admin: L("প্রশাসনিক কর্মকর্তা", "Administrative Officer"),
-  police: L("গ্রাম পুলিশ", "Village Police"),
-  uno: L("ইউএনও", "UNO"),
-  super: L("সুপার অ্যাডমিন", "Super Admin"),
-}[r] ?? r);
+export const roleLabel = (r: string, L: (b: string, e: string) => string) =>
+  ({
+    worker: L("ইপিআই / স্বাস্থ্যকর্মী", "EPI / Health Worker"),
+    admin: L("প্রশাসনিক কর্মকর্তা", "Administrative Officer"),
+    police: L("গ্রাম পুলিশ", "Village Police"),
+    uno: L("ইউএনও", "UNO"),
+    super: L("সুপার অ্যাডমিন", "Super Admin"),
+  })[r] ?? r;

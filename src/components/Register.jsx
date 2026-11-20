@@ -13,9 +13,9 @@ import {
 import { submitStaffRegistrationRequest } from "@/lib/auth.functions";
 import { EXECUTIVE_POSITIONS } from "@/lib/dashboard-roles";
 import { MONIRAMPUR_STATIONS } from "@/lib/monirampur-stations";
+import { EXECUTIVE_CATEGORY, EXECUTIVE_JURISDICTIONS } from "@/lib/registration-request";
 import { useApp } from "@/lib/store";
 
-const EXECUTIVE_CATEGORY = "উচ্চ পর্যায়ের নির্বাহী প্যানেল";
 const fieldClassName =
   "border-slate-300 bg-slate-50 shadow-sm focus-visible:ring-emerald-700";
 
@@ -23,7 +23,6 @@ const initialForm = {
   fullName: "",
   email: "",
   mobile: "",
-  officeName: "",
   category: "স্বাস্থ্যকর্মী",
   requestedPosition: "",
   jurisdictionId: "", // ইউনিয়ন বা অন্যান্য প্রশাসনিক এলাকার আইডি
@@ -79,30 +78,42 @@ export default function Register() {
           fullName: formData.fullName.trim(),
           email: formData.email.trim(),
           mobile: formData.mobile.trim() || undefined,
-          officeName: formData.officeName.trim(),
           category: formData.category,
           requestedPosition: formData.requestedPosition || undefined,
           unionId: formData.category !== EXECUTIVE_CATEGORY ? formData.jurisdictionId : undefined,
-          jurisdictionId: formData.category === EXECUTIVE_CATEGORY ? formData.jurisdictionId : undefined,
+          jurisdictionId:
+            formData.category === EXECUTIVE_CATEGORY ? formData.jurisdictionId : undefined,
         },
       });
 
       if (!result.ok) {
         const text =
-          result.error === "bad_phone"
+          result.error === "invalid_request"
+            ? L("তথ্যগুলো যাচাই করে আবার চেষ্টা করুন", "Check the form details and try again")
+            : result.error === "bad_phone"
             ? L("সঠিক মোবাইল নম্বর দিন (01XXXXXXXXX)", "Enter a valid mobile number (01XXXXXXXXX)")
             : result.error === "bad_union" || result.error === "bad_jurisdiction"
               ? L("সঠিক এলাকা বেছে নিন", "Select a valid jurisdiction")
               : result.error === "duplicate"
                 ? L(
-                    "এই ইমেইল দিয়ে একটি অনুরোধ ইতিমধ্যে জমা হয়েছে",
-                    "A request with this email has already been submitted",
+                    "এই ইমেইল বা মোবাইল দিয়ে একটি অনুরোধ ইতিমধ্যে জমা হয়েছে",
+                    "A request with this email or mobile number has already been submitted",
                   )
                 : result.error === "too_many"
                   ? L(
                       "অনেকবার অনুরোধ করা হয়েছে। পরে আবার চেষ্টা করুন",
                       "Too many requests. Please try again later",
                     )
+                  : result.error === "configuration"
+                    ? L(
+                        "সার্ভার কনফিগারেশন সমস্যার কারণে অনুরোধ জমা হয়নি। প্রশাসকের সঙ্গে যোগাযোগ করুন",
+                        "The request could not be submitted because of a server configuration issue. Contact an administrator.",
+                      )
+                    : result.error === "database"
+                      ? L(
+                          "ডাটাবেজে সমস্যা হয়েছে। কিছুক্ষণ পরে আবার চেষ্টা করুন",
+                          "A database error occurred. Please try again shortly.",
+                        )
                   : L(
                       "অনুরোধ জমা দেওয়া যায়নি। পরে আবার চেষ্টা করুন",
                       "Could not submit the request. Please try again later",
@@ -120,7 +131,10 @@ export default function Register() {
         ),
       });
     } catch (error) {
-      console.error("Could not submit staff registration request", error);
+      console.error(
+        "Could not submit staff registration request",
+        error instanceof Error ? error.message : "Unknown client request error",
+      );
       setMessage({
         type: "error",
         text: L(
@@ -198,24 +212,6 @@ export default function Register() {
         </div>
 
         <div className="space-y-1.5">
-          <Label className="text-lg" htmlFor="registration-office-name">
-            {L("অফিসের নাম", "Office name")}
-          </Label>
-          <Input
-            className={`h-11 text-lg md:text-lg ${fieldClassName}`}
-            id="registration-office-name"
-            autoComplete="organization"
-            maxLength={120}
-            value={formData.officeName}
-            onChange={(event) => updateField("officeName", event.target.value)}
-            required
-            disabled={loading}
-          />
-        </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
           <Label className="text-lg" htmlFor="registration-category">
             {L("যে ভূমিকার জন্য আবেদন", "Role requested")}
           </Label>
@@ -249,7 +245,9 @@ export default function Register() {
             </SelectContent>
           </Select>
         </div>
+      </div>
 
+      <div className="grid gap-4 sm:grid-cols-2">
         {formData.category === EXECUTIVE_CATEGORY && (
           <div className="space-y-1.5">
             <Label className="text-lg" htmlFor="registration-position">
@@ -279,42 +277,48 @@ export default function Register() {
             </Select>
           </div>
         )}
-      </div>
 
-      {/* গতিশীল এলাকা নির্বাচন ফিল্ড (ইউনিয়ন অথবা পদবি অনুযায়ী উপজেলা/জেলা/বিভাগ/পৌরসভা) */}
-      <div className="space-y-1.5">
-        <Label className="text-lg" htmlFor="registration-jurisdiction">
-          {L(jurisdictionLabel.bn, jurisdictionLabel.en)}
-        </Label>
-        <Select
-          value={formData.jurisdictionId}
-          onValueChange={(value) => updateField("jurisdictionId", value)}
-          disabled={loading || (formData.category === EXECUTIVE_CATEGORY && !formData.requestedPosition)}
+        {/* গতিশীল এলাকা নির্বাচন ফিল্ড (ইউনিয়ন অথবা পদবি অনুযায়ী উপজেলা/জেলা/বিভাগ/পৌরসভা) */}
+        <div
+          className={`space-y-1.5 ${
+            formData.category === EXECUTIVE_CATEGORY ? "" : "sm:col-span-2"
+          }`}
         >
-          <SelectTrigger
-            className={`h-11 text-lg ${fieldClassName}`}
-            id="registration-jurisdiction"
+          <Label className="text-lg" htmlFor="registration-jurisdiction">
+            {L(jurisdictionLabel.bn, jurisdictionLabel.en)}
+          </Label>
+          <Select
+            value={formData.jurisdictionId}
+            onValueChange={(value) => updateField("jurisdictionId", value)}
+            disabled={loading || (formData.category === EXECUTIVE_CATEGORY && !formData.requestedPosition)}
           >
-            <SelectValue placeholder={L("এলাকা বেছে নিন", "Select jurisdiction")} />
-          </SelectTrigger>
-          <SelectContent>
-            {formData.category !== EXECUTIVE_CATEGORY ? (
-              MONIRAMPUR_STATIONS.filter((station) => station.type === "union").map((station) => (
-                <SelectItem className="text-lg" key={station.id} value={station.id}>
-                  {L(station.bn, station.en)}
-                </SelectItem>
-              ))
-            ) : (
-              // নির্বাহী প্যানেলের জন্য ডেমো বা সংশ্লিষ্ট এলাকার লিস্ট (প্রয়োজন অনুযায়ী স্ট্যাটিক বা ডাইনামিক ডেটা দিতে পারেন)
-              <>
-                <SelectItem className="text-lg" value="manirampur_upazila">মণিরামপুর উপজেলা</SelectItem>
-                <SelectItem className="text-lg" value="jashore_district">যশোর জেলা</SelectItem>
-                <SelectItem className="text-lg" value="khulna_division">খুলনা বিভাগ</SelectItem>
-                <SelectItem className="text-lg" value="manirampur_paurasabha">মণিরামপুর পৌরসভা</SelectItem>
-              </>
-            )}
-          </SelectContent>
-        </Select>
+            <SelectTrigger
+              className={`h-11 text-lg ${fieldClassName}`}
+              id="registration-jurisdiction"
+            >
+              <SelectValue placeholder={L("এলাকা বেছে নিন", "Select jurisdiction")} />
+            </SelectTrigger>
+            <SelectContent>
+              {formData.category !== EXECUTIVE_CATEGORY ? (
+                MONIRAMPUR_STATIONS.filter((station) => station.type === "union").map((station) => (
+                  <SelectItem className="text-lg" key={station.id} value={station.id}>
+                    {L(station.bn, station.en)}
+                  </SelectItem>
+                ))
+              ) : (
+                EXECUTIVE_JURISDICTIONS.filter((jurisdiction) =>
+                  jurisdiction.positions.some(
+                    (position) => position === formData.requestedPosition,
+                  ),
+                ).map((jurisdiction) => (
+                  <SelectItem className="text-lg" key={jurisdiction.id} value={jurisdiction.id}>
+                    {L(jurisdiction.bn, jurisdiction.en)}
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {message && (
@@ -339,7 +343,6 @@ export default function Register() {
           !formData.fullName.trim() ||
           !formData.email.trim() ||
           !formData.jurisdictionId ||
-          !formData.officeName.trim() ||
           (formData.category === EXECUTIVE_CATEGORY && !formData.requestedPosition)
         }
       >

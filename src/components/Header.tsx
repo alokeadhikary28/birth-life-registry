@@ -41,10 +41,7 @@ import {
 } from "@/lib/dashboard-roles";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  sendPhoneOtp,
-  verifyPhoneOtp,
-} from "@/lib/auth.functions";
+import { sendPhoneOtp, verifyPhoneOtp } from "@/lib/auth.functions";
 
 export function Header() {
   const {
@@ -455,10 +452,13 @@ export function RoleSwitcherBar() {
 }
 
 export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { L, n, demoLoginAvailable, enterDemoLogin } = useApp();
+  const { L, n, demoLoginAvailable, enterDemoLogin, refreshAuth } = useApp();
   const nav = useNavigate();
-  const sendOtp = useServerFn(sendPhoneOtp), verifyOtp = useServerFn(verifyPhoneOtp);
-  const [mobile, setMobile] = useState(""); const [otp, setOtp] = useState(""); const [sent, setSent] = useState(false);
+  const sendOtp = useServerFn(sendPhoneOtp);
+  const verifyOtp = useServerFn(verifyPhoneOtp);
+  const [mobile, setMobile] = useState("");
+  const [otp, setOtp] = useState("");
+  const [sent, setSent] = useState(false);
   const [loginMessage, setLoginMessage] = useState<"pending" | "rejected" | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -467,22 +467,63 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
       setLoginMessage("pending");
     } else if (r.error === "rejected") {
       setLoginMessage("rejected");
-    } else if (r.error === "locked" || r.error === "too_many")
-      toast.error(L(`অনেকবার চেষ্টা করা হয়েছে। ${n(r.lockedMinutes ?? 15)} মিনিট পর আবার চেষ্টা করুন`, `Too many attempts. Try again in ${r.lockedMinutes ?? 15} minutes`));
-    else if (r.error === "bad_phone") toast.error(L("সঠিক মোবাইল নম্বর দিন (01XXXXXXXXX)", "Enter a valid mobile number (01XXXXXXXXX)"));
-    else if (r.error === "sms_failed") toast.error(L("SMS পাঠানো যায়নি, পরে চেষ্টা করুন", "Could not send SMS, try later"));
-    else toast.error(r.error === "unavailable"
-      ? L("সেবা সাময়িকভাবে অনুপলব্ধ, পরে চেষ্টা করুন", "The service is temporarily unavailable; try again later")
-      : L("তথ্য সঠিক নয়", "Details are incorrect"));
+    } else if (r.error === "locked" || r.error === "too_many") {
+      toast.error(
+        L(
+          `অনেকবার চেষ্টা করা হয়েছে। ${n(r.lockedMinutes ?? 15)} মিনিট পর আবার চেষ্টা করুন`,
+          `Too many attempts. Try again in ${r.lockedMinutes ?? 15} minutes`,
+        ),
+      );
+    } else if (r.error === "bad_phone") {
+      toast.error(
+        L("সঠিক মোবাইল নম্বর দিন (01XXXXXXXXX)", "Enter a valid mobile number (01XXXXXXXXX)"),
+      );
+    } else if (r.error === "sms_failed") {
+      toast.error(L("SMS পাঠানো যায়নি, পরে চেষ্টা করুন", "Could not send SMS, try later"));
+    } else if (r.error === "configuration") {
+      toast.error(
+        L(
+          "লগইন সেবা কনফিগার করা নেই। প্রশাসকের সঙ্গে যোগাযোগ করুন",
+          "The sign-in service is not configured. Contact an administrator.",
+        ),
+      );
+    } else {
+      toast.error(
+        r.error === "unavailable"
+          ? L(
+              "সেবা সাময়িকভাবে অনুপলব্ধ, পরে চেষ্টা করুন",
+              "The service is temporarily unavailable; try again later",
+            )
+          : L("তথ্য সঠিক নয়", "Details are incorrect"),
+      );
+    }
   };
   const done = async (tokens: { access_token: string; refresh_token: string }) => {
     const { error } = await supabase.auth.setSession(tokens);
-    if (error) { toast.error(error.message); return; }
-    onClose(); setSent(false); setOtp(""); nav({ to: "/dashboard" });
+    if (error) {
+      console.error("Could not establish Supabase session", { message: error.message });
+      toast.error(
+        L(
+          "লগইন সেশন তৈরি করা যায়নি। আবার চেষ্টা করুন",
+          "Could not establish the sign-in session. Please try again.",
+        ),
+      );
+      return;
+    }
+    await refreshAuth();
+    onClose();
+    setSent(false);
+    setOtp("");
+    nav({ to: "/dashboard" });
   };
   const enterLocalRolePreview = (role: "worker" | "police" | "admin" | "uno") => {
     enterDemoLogin(role);
-    toast.info(L("ডেমো ড্যাশবোর্ড · পরিবর্তন শুধু এই ট্যাবে থাকবে", "Demo dashboard · changes stay in this tab"));
+    toast.info(
+      L(
+        "ডেমো ড্যাশবোর্ড · পরিবর্তন শুধু এই ট্যাবে থাকবে",
+        "Demo dashboard · changes stay in this tab",
+      ),
+    );
     onClose();
     nav({ to: "/dashboard" });
   };
@@ -491,8 +532,16 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
     try {
       await f();
     } catch (cause) {
-      console.error("Authentication operation failed", cause instanceof Error ? cause.message : "Unknown error");
-      toast.error(L("সেবা সাময়িকভাবে অনুপলব্ধ, পরে চেষ্টা করুন", "The service is temporarily unavailable; try again later"));
+      console.error(
+        "Authentication operation failed",
+        cause instanceof Error ? cause.message : "Unknown error",
+      );
+      toast.error(
+        L(
+          "সেবা সাময়িকভাবে অনুপলব্ধ, পরে চেষ্টা করুন",
+          "The service is temporarily unavailable; try again later",
+        ),
+      );
     } finally {
       setBusy(false);
     }

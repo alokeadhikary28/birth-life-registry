@@ -10,7 +10,8 @@ export function publicClient() {
     global: {
       fetch: (input, init) => {
         const h = new Headers(init?.headers);
-        if (key.startsWith("sb_") && h.get("Authorization") === `Bearer ${key}`) h.delete("Authorization");
+        if (key.startsWith("sb_") && h.get("Authorization") === `Bearer ${key}`)
+          h.delete("Authorization");
         h.set("apikey", key);
         return fetch(input, { ...init, headers: h });
       },
@@ -23,7 +24,11 @@ export async function admin() {
 }
 
 export function clientIp() {
-  return (getRequestHeader("cf-connecting-ip") || getRequestHeader("x-forwarded-for") || "").split(",")[0]!.trim() || "unknown";
+  return (
+    (getRequestHeader("cf-connecting-ip") || getRequestHeader("x-forwarded-for") || "")
+      .split(",")[0]!
+      .trim() || "unknown"
+  );
 }
 
 export function origin() {
@@ -40,13 +45,37 @@ export const LIMITS = { perIdentifier: 5, perIp: 30, otpSends: 3 };
 export async function lockoutMinutes(identifier: string, ip: string) {
   const db = await admin();
   const since = new Date(Date.now() - WINDOW_MIN * 60000).toISOString();
-  const [{ data: byId }, { count: ipFails }] = await Promise.all([
-    db.from("login_attempts").select("at, success").eq("identifier", identifier).gte("at", since).order("at", { ascending: false }).limit(20),
-    db.from("login_attempts").select("id", { count: "exact", head: true }).eq("ip", ip).eq("success", false).gte("at", since),
+  const [byIdentifier, byIp] = await Promise.all([
+    db
+      .from("login_attempts")
+      .select("at, success")
+      .eq("identifier", identifier)
+      .gte("at", since)
+      .order("at", { ascending: false })
+      .limit(20),
+    db
+      .from("login_attempts")
+      .select("id", { count: "exact", head: true })
+      .eq("ip", ip)
+      .eq("success", false)
+      .gte("at", since),
   ]);
+  if (byIdentifier.error || byIp.error) {
+    const error = byIdentifier.error ?? byIp.error;
+    console.error("Could not check authentication lockout", {
+      code: error.code,
+      message: error.message,
+    });
+    throw error;
+  }
+  const byId = byIdentifier.data;
+  const ipFails = byIp.count;
   // consecutive failures since last success
   const fails: string[] = [];
-  for (const a of byId ?? []) { if (a.success) break; fails.push(a.at); }
+  for (const a of byId ?? []) {
+    if (a.success) break;
+    fails.push(a.at);
+  }
   if (fails.length >= LIMITS.perIdentifier) {
     const oldest = new Date(fails[LIMITS.perIdentifier - 1]!).getTime();
     return Math.max(1, Math.ceil((oldest + WINDOW_MIN * 60000 - Date.now()) / 60000));
@@ -57,14 +86,41 @@ export async function lockoutMinutes(identifier: string, ip: string) {
 
 export async function recentCount(identifier: string, method: string, minutes: number) {
   const db = await admin();
-  const { count } = await db.from("login_attempts").select("id", { count: "exact", head: true })
-    .eq("identifier", identifier).eq("method", method).gte("at", new Date(Date.now() - minutes * 60000).toISOString());
+  const { count, error } = await db
+    .from("login_attempts")
+    .select("id", { count: "exact", head: true })
+    .eq("identifier", identifier)
+    .eq("method", method)
+    .gte("at", new Date(Date.now() - minutes * 60000).toISOString());
+  if (error) {
+    console.error("Could not check authentication rate limit", {
+      method,
+      code: error.code,
+      message: error.message,
+    });
+    throw error;
+  }
   return count ?? 0;
 }
 
-export async function logAttempt(identifier: string, method: string, ip: string, success: boolean, reason?: string) {
+export async function logAttempt(
+  identifier: string,
+  method: string,
+  ip: string,
+  success: boolean,
+  reason?: string,
+) {
   const db = await admin();
-  await db.from("login_attempts").insert({ identifier, method, ip, success, reason: reason ?? null });
+  const { error } = await db
+    .from("login_attempts")
+    .insert({ identifier, method, ip, success, reason: reason ?? null });
+  if (error) {
+    console.error("Could not record authentication attempt", {
+      method,
+      code: error.code,
+      message: error.message,
+    });
+  }
 }
 
 export function normalizePhone(m: string) {
@@ -76,5 +132,7 @@ export function normalizePhone(m: string) {
 
 export async function sha256(s: string) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
-  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }

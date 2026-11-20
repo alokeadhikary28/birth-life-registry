@@ -101,10 +101,17 @@ and restrictive MFA policies for privileged roles. The app also requires a
 private `case-files` Storage bucket; existing Storage policies scope uploads by
 role and administrative area and reads to visible cases.
 
-Before applying migrations to a connected project, reconcile migration status:
-`drizzle/migrations/meta/_journal.json` currently ends at `0011`, while SQL
-files `0012` and `0013` are present but absent from that journal. Confirm which
-SQL has already been applied in the target database first; do not blindly run
-the migration directory against production. Live RLS and Storage behavior must
-be verified against the connected Supabase project after its deployment
-secrets and migration history are confirmed.
+`supabase/registration-recovery.sql` is an idempotent SQL Editor bootstrap for
+the current Manirampur staff-registration and approval flow only. It creates
+the required request/profile/role and administrative-area schema and seeds
+Manirampur's 18 unions/municipality; it does not restore case registration,
+monitoring, Storage, or the rest of the application schema. It does not create
+demo staff accounts or authentication users.
+
+Before applying the full migration history to a connected project, reconcile
+migration status: `drizzle/migrations/meta/_journal.json` currently ends at
+`0039`, while `0040_case_field_visit_workflow.sql` is present but absent from
+that journal. Confirm which SQL has already been applied in the target database
+first; do not blindly run the migration directory against production. Live RLS
+and Storage behavior must be verified against the connected Supabase project
+after its deployment secrets and migration history are confirmed.

@@ -12,9 +12,15 @@ export const Route = createFileRoute("/dashboard")({
   head: () => ({
     meta: [
       { title: "Dashboard — Upazila E-Registration Tracker" },
-      { name: "description", content: "Role-based dashboard for birth and death registration tracking." },
+      {
+        name: "description",
+        content: "Role-based dashboard for birth and death registration tracking.",
+      },
       { property: "og:title", content: "Dashboard — Upazila E-Registration Tracker" },
-      { property: "og:description", content: "Role-based dashboard for birth and death registration tracking." },
+      {
+        property: "og:description",
+        content: "Role-based dashboard for birth and death registration tracking.",
+      },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -22,17 +28,20 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function Dashboard() {
-  const { user, L, authReady, mfa, enterDemoLogin } = useApp();
+  const { user, L, authReady, mfa, demoLoginAvailable, enterDemoLogin } = useApp();
   const [open, setOpen] = useState(false);
   const isSectionRoute = useRouterState({
     select: (routerState) => routerState.location.pathname.startsWith("/dashboard/"),
   });
 
   useEffect(() => {
-    if (authReady && import.meta.env.DEV && !user) enterDemoLogin("uno");
-  }, [authReady, enterDemoLogin, user]);
+    if (authReady && demoLoginAvailable && !user) enterDemoLogin("uno");
+  }, [authReady, demoLoginAvailable, enterDemoLogin, user]);
+  useEffect(() => {
+    if (authReady && !user && !demoLoginAvailable) setOpen(true);
+  }, [authReady, demoLoginAvailable, user]);
 
-  if (!authReady || (import.meta.env.DEV && !user)) {
+  if (!authReady || (demoLoginAvailable && !user)) {
     return <div className="py-20 text-center text-muted-foreground">…</div>;
   }
   if (user && mfa !== "ok") return <MfaGate />;
@@ -50,7 +59,12 @@ function Dashboard() {
   }
 
   if (user.role === "super") {
-    return <div className="super-dashboard mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8"><ModuleNavigation /><SuperDashboard /></div>;
+    return (
+      <div className="super-dashboard mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8">
+        <ModuleNavigation />
+        <SuperDashboard />
+      </div>
+    );
   }
 
   return (

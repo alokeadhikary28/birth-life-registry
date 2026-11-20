@@ -75,10 +75,17 @@ export function clientIp() {
 }
 
 export function origin() {
-  const o = getRequestHeader("origin");
-  if (o) return o;
+  const requestOrigin = getRequestHeader("origin");
+  if (requestOrigin) {
+    const parsedOrigin = new URL(requestOrigin);
+    if (parsedOrigin.protocol === "http:" || parsedOrigin.protocol === "https:") {
+      return parsedOrigin.origin;
+    }
+  }
   const host = getRequestHeader("host");
-  return host ? `https://${host}` : "";
+  if (!host) return "";
+  const isLocalHost = /^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(host);
+  return `${isLocalHost ? "http" : "https"}://${host}`;
 }
 
 const WINDOW_MIN = 15;

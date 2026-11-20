@@ -754,6 +754,8 @@ export const createStaff = createServerFn({ method: "POST" })
     }
 
     let registrationRequestId: string | undefined;
+    let registrationEmail: string | null = null;
+    let registrationPhone: string | null = null;
     if (data.registrationRequestId) {
       if (!isRequestApproval) {
         return { ok: false as const, error: "bad_request" };
@@ -817,6 +819,8 @@ export const createStaff = createServerFn({ method: "POST" })
       ) {
         return { ok: false as const, error: "bad_request" };
       }
+      registrationEmail = request.email?.trim().toLowerCase() ?? null;
+      registrationPhone = request.phone ? normalizePhone(request.phone) : null;
 
       const { data: claimedRequest, error: claimError } = await db
         .from("staff_registration_requests")
@@ -849,9 +853,7 @@ export const createStaff = createServerFn({ method: "POST" })
     };
 
     const fieldEmail =
-      fieldRole && data.registrationRequestId
-        ? z.string().email().safeParse(data.contact.trim().toLowerCase())
-        : null;
+      fieldRole && registrationEmail ? z.string().email().safeParse(registrationEmail) : null;
     const fieldEmailAddress = fieldEmail?.success ? fieldEmail.data : null;
     let created;
     if (fieldEmailAddress) {
@@ -909,7 +911,9 @@ export const createStaff = createServerFn({ method: "POST" })
       id: uid,
       name_bn: data.nameBn,
       name_en: data.nameEn,
-      mobile: fieldEmailAddress ? null : fieldRole ? normalizePhone(data.contact) : null,
+      mobile: fieldRole
+        ? (registrationPhone ?? (fieldEmailAddress ? null : normalizePhone(data.contact)))
+        : null,
       email: fieldRole ? fieldEmailAddress : data.contact.toLowerCase(),
       district_id: districtId,
       upazila_id: data.role === "district" || data.role === "super" ? null : data.upazilaId,

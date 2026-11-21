@@ -105,9 +105,14 @@
   overflow-y: auto;
 }
 
-.dashboard-viewport:has(details[open]),
-.dashboard-viewport:has(.super-dashboard) {
+.dashboard-viewport:has(details[open]) {
   overflow-y: auto;
+}
+
+.dashboard-viewport:has(.super-dashboard) {
+  height: calc(100svh - 4.125rem);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .dashboard-viewport:has(details[open]) .national-dashboard {
@@ -117,6 +122,73 @@
 .dashboard-content {
   scrollbar-width: thin;
   overflow-y: auto;
+}
+
+.super-admin-shell {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 1.5rem 1rem;
+}
+
+.super-admin-shell--fill {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+
+.super-admin-shell__header {
+  min-height: 2.5rem;
+  margin-bottom: 0.75rem;
+  flex: 0 0 auto;
+}
+
+.super-admin-shell__content {
+  min-width: 0;
+}
+
+.super-admin-action-grid {
+  grid-auto-rows: clamp(4.5rem, calc((100svh - 28rem) / 4), 6.5rem);
+  align-content: center;
+  gap: 0.625rem;
+}
+
+.super-admin-shell__content--fill {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 0%;
+}
+
+@media (min-width: 640px) {
+  .super-admin-shell {
+    padding-right: 1.5rem;
+    padding-left: 1.5rem;
+  }
+
+  .super-admin-action-grid {
+    gap: 0.75rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .super-admin-shell {
+    padding-right: 2rem;
+    padding-left: 2rem;
+  }
+}
+
+.super-admin-history .text-xs,
+.super-admin-monitoring .text-xs {
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+}
+
+.super-admin-history .text-sm,
+.super-admin-monitoring .text-sm {
+  font-size: 1rem;
+  line-height: 1.65rem;
 }
 
 @keyframes announcement-marquee {

@@ -499,10 +499,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             id: p.id,
             name: { bn: p.name_bn, en: p.name_en },
             role: role ?? "worker",
+            approvalStatus: p.approval_status ?? (p.active ? "approved" : "pending"),
+            executivePosition: p.executive_position ?? undefined,
             active: p.active,
             mobile: p.mobile ?? undefined,
             email: p.email ?? undefined,
             upazilaId: p.upazila_id ?? "",
+            districtId: p.district_id ?? undefined,
             stationId: p.station_id ?? p.union_id ?? undefined,
             unionId: p.union_id ?? undefined,
             ward: p.ward ?? undefined,
@@ -552,6 +555,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setAuthReady(true);
       return;
     }
+    const clearSignedOutState = () => {
+      setUser(null);
+      setState(empty);
+      setAnnouncements([]);
+      setMfa("ok");
+    };
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+    if (sessionError) {
+      console.error("Could not read the current Supabase session", {
+        message: sessionError.message,
+      });
+      clearSignedOutState();
+      setAuthReady(true);
+      toast.error(
+        L(
+          "সেশন যাচাই করা যায়নি। আবার লগইন করুন",
+          "Could not verify the session. Please sign in again",
+        ),
+      );
+      return;
+    }
+    if (!session) {
+      clearSignedOutState();
+      setAuthReady(true);
+      return;
+    }
     const {
       data: { user: au },
       error: authError,
@@ -560,10 +592,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       console.error("Could not verify the current Supabase session", {
         message: authError.message,
       });
-      setUser(null);
-      setState(empty);
-      setAnnouncements([]);
-      setMfa("ok");
+      clearSignedOutState();
       setAuthReady(true);
       toast.error(
         L(
@@ -574,10 +603,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return;
     }
     if (!au) {
-      setUser(null);
-      setState(empty);
-      setAnnouncements([]);
-      setMfa("ok");
+      clearSignedOutState();
       setAuthReady(true);
       return;
     }
@@ -593,9 +619,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         rolesError: rolesError ? { code: rolesError.code, message: rolesError.message } : undefined,
       });
       setUser(null);
-      setState(empty);
-      setAnnouncements([]);
-      setMfa("ok");
+      clearSignedOutState();
       setAuthReady(true);
       toast.error(
         L(
@@ -615,18 +639,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       toast.error(
         p?.status === "pending" || p?.approval_status === "pending"
           ? L(
-              "Waiting for Approval — আপনার অ্যাকাউন্ট অনুমোদনের অপেক্ষায় আছে।",
-              "Waiting for Approval — your account is awaiting review.",
+              "আপনার আবেদন অনুমোদনের অপেক্ষায় আছে। অনুমোদন না হওয়া পর্যন্ত প্যানেলে প্রবেশ করা যাবে না।",
+              "Your application is awaiting approval. Panel access is unavailable until it is approved.",
             )
-          : p?.status === "rejected" || p?.approval_status === "rejected"
-            ? L("আপনার নিবন্ধন অনুমোদিত হয়নি।", "Your registration was not approved.")
-            : L("এই অ্যাকাউন্টের অনুমতি নেই", "This account has no access"),
+          : p?.status === "suspended" || p?.approval_status === "suspended"
+            ? L("আপনার অ্যাকাউন্ট সাময়িকভাবে স্থগিত।", "Your account is currently suspended.")
+            : p?.status === "cancelled" ||
+                p?.approval_status === "cancelled" ||
+                p?.status === "rejected" ||
+                p?.approval_status === "rejected"
+              ? L("আপনার অ্যাকাউন্ট বাতিল করা হয়েছে।", "Your account has been cancelled.")
+              : L("এই অ্যাকাউন্টের অনুমতি নেই", "This account has no access"),
       );
       await supabase.auth.signOut();
-      setUser(null);
-      setState(empty);
-      setAnnouncements([]);
-      setMfa("ok");
+      clearSignedOutState();
       setAuthReady(true);
       return;
     }
@@ -647,6 +673,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       id: au.id,
       name: { bn: p.name_bn, en: p.name_en },
       role,
+      approvalStatus: p.approval_status,
+      executivePosition: p.executive_position ?? undefined,
       mobile: p.mobile ?? undefined,
       email: p.email ?? undefined,
       upazilaId: p.upazila_id ?? "",
@@ -1543,5 +1571,6 @@ export const roleLabel = (r: string, L: (b: string, e: string) => string) =>
     admin: L("প্রশাসনিক কর্মকর্তা", "Administrative Officer"),
     police: L("গ্রাম পুলিশ", "Village Police"),
     uno: L("ইউএনও", "UNO"),
+    district: L("জেলা পর্যায়ের কর্মকর্তা", "District Officer"),
     super: L("সুপার অ্যাডমিন", "Super Admin"),
   })[r] ?? r;

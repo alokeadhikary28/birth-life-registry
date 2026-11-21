@@ -2,10 +2,11 @@ import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router"
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { RegistrationDashboard } from "@/components/dashboards/RegistrationDashboard";
+import { SuperAdminShell } from "@/components/dashboards/SuperAdminShell";
 import { SuperDashboard } from "@/components/dashboards/Super";
+import { ModuleNavigation } from "@/components/modules/ModuleNavigation";
 import { LoginDialog } from "@/components/Header";
 import { MfaGate } from "@/components/MfaGate";
-import { ModuleNavigation } from "@/components/modules/ModuleNavigation";
 import { useApp } from "@/lib/store";
 
 export const Route = createFileRoute("/dashboard")({
@@ -60,10 +61,9 @@ function Dashboard() {
 
   if (user.role === "super") {
     return (
-      <div className="super-dashboard mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8">
-        <ModuleNavigation />
+      <SuperAdminShell className="super-dashboard" fullHeight>
         <SuperDashboard />
-      </div>
+      </SuperAdminShell>
     );
   }
 

@@ -1,3 +1,5 @@
+import type { ExecutivePreviewRole } from "./dashboard-roles";
+
 export type Role = "worker" | "admin" | "police" | "uno" | "super" | "district";
 export type Bi = { bn: string; en: string };
 
@@ -48,6 +50,8 @@ export interface User {
   id: string;
   name: Bi;
   role: Role;
+  approvalStatus?: "pending" | "approved" | "rejected" | "suspended" | "cancelled" | undefined;
+  executivePosition?: ExecutivePreviewRole | undefined;
   active?: boolean | undefined;
   mobile?: string | undefined;
   email?: string | undefined;
@@ -116,11 +120,13 @@ export interface PoliceTask {
 }
 
 export interface CaseFileMetadata {
-  fieldVisit?: {
-    capturedAt: string;
-    latitude?: number | undefined;
-    longitude?: number | undefined;
-  } | undefined;
+  fieldVisit?:
+    | {
+        capturedAt: string;
+        latitude?: number | undefined;
+        longitude?: number | undefined;
+      }
+    | undefined;
 }
 
 export interface RegCase {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Check, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ModuleNavigation } from "./ModuleNavigation";
+import { PENDING_APPROVALS_CHANGED_EVENT } from "./ModuleNavigation";
 import { PageTitle } from "@/components/shared";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -14,8 +14,7 @@ import {
 import { EXECUTIVE_POSITIONS, type ExecutivePreviewRole } from "@/lib/dashboard-roles";
 import { useApp } from "@/lib/store";
 
-type FieldStaffRole = "worker" | "police";
-type StaffRole = FieldStaffRole | "admin" | "uno" | "district" | "super";
+type StaffRole = "worker" | "police" | "admin" | "uno" | "district" | "super";
 type RegistrationCategory =
   "স্বাস্থ্যকর্মী" | "গ্রাম পুলিশ" | "ইউপি প্রশাসনিক কর্মকর্তা" | "উচ্চ পর্যায়ের নির্বাহী প্যানেল";
 
@@ -25,7 +24,7 @@ type Applicant = {
   nameEn: string;
   email: string | null;
   mobile: string | null;
-  role: FieldStaffRole;
+  role: StaffRole;
 
   createdAt: string;
 };
@@ -46,10 +45,17 @@ type RegistrationRequest = {
   createdAt: string;
 };
 
+function notifyPendingApprovalCountChanged() {
+  window.dispatchEvent(new Event(PENDING_APPROVALS_CHANGED_EVENT));
+}
+
 function roleName(role: StaffRole, L: (bn: string, en: string) => string) {
   if (role === "worker") return L("স্বাস্থ্যকর্মী", "Health Worker");
   if (role === "police") return L("গ্রাম পুলিশ", "Gram Police");
   if (role === "admin") return L("ইউপি প্রশাসনিক কর্মকর্তা", "UP Administrative Officer");
+  if (role === "uno") return L("উপজেলা নির্বাহী কর্মকর্তা", "Upazila Nirbahi Officer");
+  if (role === "district") return L("জেলা পর্যায়ের কর্মকর্তা", "District Officer");
+  if (role === "super") return L("সুপার অ্যাডমিন", "Super Admin");
   return L("উচ্চ পর্যায়ের নির্বাহী প্যানেল", "Higher-Level Executive Panel");
 }
 
@@ -86,7 +92,12 @@ export function ApprovalManagement() {
         setApplicants(
           result.applicants.filter(
             (applicant): applicant is Applicant =>
-              applicant.role === "worker" || applicant.role === "police",
+              applicant.role === "worker" ||
+              applicant.role === "police" ||
+              applicant.role === "admin" ||
+              applicant.role === "uno" ||
+              applicant.role === "district" ||
+              applicant.role === "super",
           ),
         );
         setRequests(
@@ -107,6 +118,7 @@ export function ApprovalManagement() {
                 : typeof request.unionId === "string"),
           ),
         );
+        notifyPendingApprovalCountChanged();
       }
     } catch (cause) {
       console.error("Could not load pending registrations", cause);
@@ -141,6 +153,9 @@ export function ApprovalManagement() {
         },
       });
       if (!result.ok) {
+        console.error("Could not provision staff registration request", {
+          error: result.error,
+        });
         if (result.error === "mfa_required") {
           toast.error(L("অনুমোদনের জন্য MFA যাচাই করুন", "Verify MFA to approve this request"));
         } else if (result.error === "request_unavailable") {
@@ -157,11 +172,72 @@ export function ApprovalManagement() {
               "Password setup email could not be sent. Check the Supabase email provider and Redirect URLs.",
             ),
           );
+        } else if (result.error === "auth_create_failed") {
+          toast.error(
+            L(
+              "Auth user তৈরি হয়নি। Supabase server log ও auth.users trigger পরীক্ষা করুন; ইমেইল/ফোন আগে থেকেই নিবন্ধিত কি না দেখুন।",
+              "Auth user creation failed. Check the Supabase server log, auth.users triggers, and whether the email/phone already exists.",
+            ),
+          );
+        } else if (result.error === "station_scope_missing") {
+          toast.error(
+            L(
+              "এই ইউনিয়নের administrative_stations রেকর্ড নেই; এলাকা-তালিকা sync করে আবার চেষ্টা করুন।",
+              "This union is missing from administrative_stations. Sync the area catalog, then retry.",
+            ),
+          );
+        } else if (result.error === "profile_failed") {
+          toast.error(
+            L(
+              "profiles-এ অ্যাকাউন্টের তথ্য লেখা যায়নি। সার্ভার লগে constraint বা trigger-এর ত্রুটি দেখুন।",
+              "Could not write the profile. Check the server log for a profile constraint or trigger error.",
+            ),
+          );
+        } else if (result.error === "role_failed") {
+          toast.error(
+            L(
+              "user_roles-এ role যোগ করা যায়নি। app_role ও user_roles schema/log পরীক্ষা করুন।",
+              "Could not assign the role. Check the app_role/user_roles schema and server log.",
+            ),
+          );
+        } else if (result.error === "bad_request") {
+          toast.error(
+            L(
+              "আবেদনটির তথ্য বা schema মেলেনি। আবেদন pending আছে এবং সর্বশেষ 0037–0039 migration প্রয়োগ হয়েছে কি না দেখুন।",
+              "The request data or schema did not match. Confirm the request is pending and migrations 0037–0039 are applied.",
+            ),
+          );
+        } else if (result.error === "unavailable") {
+          toast.error(
+            L(
+              "ডাটাবেস যাচাই করা যায়নি। server log এবং registration schema-এর migration অবস্থা পরীক্ষা করুন।",
+              "Could not verify the database. Check the server log and registration-schema migration state.",
+            ),
+          );
         } else if (result.error === "request_update_failed") {
           toast.error(
             L(
               "অনুরোধের অবস্থা হালনাগাদ করা যায়নি। তালিকা রিফ্রেশ করে আবার যাচাই করুন।",
               "Could not finalize the request status. Refresh the list and verify before retrying.",
+            ),
+          );
+        } else if (
+          result.error === "bad_upazila" ||
+          result.error === "bad_union" ||
+          result.error === "bad_email" ||
+          result.error === "bad_phone"
+        ) {
+          toast.error(
+            L(
+              "আবেদনের ইমেইল/ফোন বা প্রশাসনিক এলাকার তথ্য যাচাই করুন।",
+              "Check the request's email/phone and administrative-area data.",
+            ),
+          );
+        } else if (result.error === "forbidden") {
+          toast.error(
+            L(
+              "শুধু aal2-verified Super Admin এই আবেদন অনুমোদন করতে পারবেন।",
+              "Only an aal2-verified Super Admin can approve this request.",
             ),
           );
         } else {
@@ -251,6 +327,7 @@ export function ApprovalManagement() {
         );
       } else {
         setApplicants((current) => current.filter((item) => item.id !== applicant.id));
+        notifyPendingApprovalCountChanged();
         toast.success(
           decision === "approve"
             ? L("ব্যবহারকারী অনুমোদিত হয়েছে", "User approved")
@@ -277,8 +354,7 @@ export function ApprovalManagement() {
   };
 
   return (
-    <main className="mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8">
-      <ModuleNavigation />
+    <main className="w-full max-w-none py-6">
       <PageTitle
         title={L("অনুমোদন ব্যবস্থাপনা", "Staff approval")}
         sub={L("সকল এলাকার অপেক্ষমাণ কর্মী নিবন্ধন", "Pending staff registrations from all areas")}

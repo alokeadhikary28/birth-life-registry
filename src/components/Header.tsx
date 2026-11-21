@@ -1,25 +1,29 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { toast } from "sonner";
 import {
   Award,
   BookOpen,
   Building2,
+  Camera,
   ChartNoAxesCombined,
   ChevronDown,
   FileText,
   Headphones,
   HeartPulse,
   Home,
+  LayoutDashboard,
   Languages,
   LogIn,
   LogOut,
+  LoaderCircle,
   MessageSquareWarning,
   Moon,
   MapPinned,
   ShieldCheck,
   Sun,
   Landmark,
+  UserRound,
   WifiOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,14 +31,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PasswordLoginForm } from "@/components/PasswordLoginForm";
 import Register from "@/components/Register";
 import { roleLabel, useApp } from "@/lib/store";
+import { compressImage } from "@/lib/compress-image";
 import { getStationsForUpazila, MONIRAMPUR_STATIONS } from "@/lib/monirampur-stations";
 import {
+  EXECUTIVE_POSITIONS,
   EXECUTIVE_PREVIEW_ROLES,
+  EXECUTIVE_ROLE_BY_POSITION,
   isPreviewRole,
   type ExecutivePreviewRole,
   type PreviewRole,
@@ -43,10 +51,117 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { sendPhoneOtp, verifyPhoneOtp } from "@/lib/auth.functions";
 
+const isOwnProfileAvatarPath = (path: unknown, userId: string): path is string =>
+  typeof path === "string" &&
+  path.startsWith(`${userId}/`) &&
+  path.split("/").length === 2 &&
+  !path.includes("..");
+
+type AvatarUploadStage =
+  | "auth_session"
+  | "compression"
+  | "storage_upload"
+  | "signed_url"
+  | "metadata_update";
+
+function getErrorField(cause: unknown, key: string): string | undefined {
+  if (typeof cause !== "object" || cause === null || !(key in cause)) return undefined;
+  const value = Reflect.get(cause, key);
+  return typeof value === "string" || typeof value === "number" ? String(value) : undefined;
+}
+
+function getAvatarUploadFailure(cause: unknown, stage: AvatarUploadStage, L: (bn: string, en: string) => string) {
+  const code = getErrorField(cause, "code");
+  const status = getErrorField(cause, "statusCode") ?? getErrorField(cause, "status");
+  const message =
+    cause instanceof Error
+      ? cause.message
+      : getErrorField(cause, "message") ??
+        (typeof cause === "string" ? cause : L("অজানা ত্রুটি", "Unknown error"));
+  const normalized = `${code ?? ""} ${status ?? ""} ${message}`.toLowerCase();
+  let help = L(
+    "Supabase Storage bucket, RLS policy এবং MFA সেশন যাচাই করুন।",
+    "Check the Supabase Storage bucket, RLS policy, and MFA session.",
+  );
+
+  if (stage === "compression") {
+    help = L(
+      "ছবিটি প্রস্তুত করা যায়নি। JPG, PNG বা WebP ছবি ২০ MB-এর মধ্যে দিন।",
+      "The image could not be prepared. Choose a JPG, PNG, or WebP image under 20 MB.",
+    );
+  } else if (
+    normalized.includes("bucket not found") ||
+    normalized.includes("bucket does not exist") ||
+    (status === "404" && stage === "storage_upload")
+  ) {
+    help = L(
+      "profile-avatars bucket পাওয়া যায়নি। Supabase-এ 0041_profile_avatars migration প্রয়োগ হয়েছে কি না যাচাই করুন।",
+      "The profile-avatars bucket is missing. Check that migration 0041_profile_avatars has been applied.",
+    );
+  } else if (
+    status === "401" ||
+    normalized.includes("jwt expired") ||
+    normalized.includes("session expired")
+  ) {
+    help = L(
+      "লগইন session মেয়াদোত্তীর্ণ। আবার লগইন করে privileged account হলে aal2 MFA সম্পন্ন করুন।",
+      "The login session expired. Sign in again and complete aal2 MFA for privileged accounts.",
+    );
+  } else if (
+    normalized.includes("row-level security") ||
+    normalized.includes("row violates") ||
+    normalized.includes("permission denied") ||
+    code === "42501" ||
+    status === "403"
+  ) {
+    help = L(
+      "নিজের profile-avatars path-এর Storage policy এবং privileged account-এর aal2 MFA session যাচাই করুন।",
+      "Check the own-folder Storage policy and the privileged account's aal2 MFA session.",
+    );
+  } else if (
+    normalized.includes("file size") ||
+    normalized.includes("too large") ||
+    normalized.includes("payload too large") ||
+    status === "413"
+  ) {
+    help = L(
+      "ছবির আকার কমানো যায়নি বা Storage সীমা ছাড়িয়েছে। অন্য/ছোট ছবি চেষ্টা করুন।",
+      "The image could not be compressed enough or exceeded the Storage limit. Try a smaller image.",
+    );
+  } else if (
+    normalized.includes("mime") ||
+    normalized.includes("content-type") ||
+    normalized.includes("not allowed")
+  ) {
+    help = L(
+      "Storage শুধু JPG, PNG বা WebP ছবি গ্রহণ করে।",
+      "Storage accepts JPG, PNG, or WebP images only.",
+    );
+  } else if (stage === "signed_url") {
+    help = L(
+      "ছবির preview URL তৈরি হয়নি। profile-avatars-এর SELECT RLS policy যাচাই করুন।",
+      "The preview URL could not be created. Check the profile-avatars SELECT RLS policy.",
+    );
+  } else if (stage === "auth_session" || stage === "metadata_update") {
+    help = L(
+      "Supabase login session এবং Auth user metadata update যাচাই করুন।",
+      "Check the Supabase login session and Auth user-metadata update.",
+    );
+  }
+
+  const details = [code ? `code ${code}` : "", status ? `HTTP ${status}` : "", message]
+    .filter(Boolean)
+    .join(" · ")
+    .slice(0, 200);
+  return details ? `${help} (${details})` : help;
+}
+
 export function Header() {
   const {
     user,
     L,
+    mfa,
+    authReady,
     lang,
     toggleLang,
     dark,
@@ -112,9 +227,239 @@ export function Header() {
     role !== undefined &&
     EXECUTIVE_PREVIEW_ROLES.some((executiveRole) => executiveRole === role);
   const executiveActive = isExecutiveRole(activeRole);
+  const profileRoleTitle =
+    user?.role === "district"
+      ? L("জেলা পর্যায়ের কর্মকর্তা", "District-level official")
+      : user
+        ? roleLabel(user.role, L)
+        : "";
+  const matchingExecutivePosition =
+    user &&
+    user.role !== "uno" &&
+    isExecutiveRole(activeRole) &&
+    EXECUTIVE_ROLE_BY_POSITION[activeRole] === user.role
+      ? EXECUTIVE_POSITIONS.find((position) => position.role === activeRole)
+      : undefined;
+  const activeProfilePositionTitle =
+    user?.role === "district" && activeRole === "ddlg_dc"
+      ? L("ডিডিএলজি / জেলা প্রশাসক", "DDLG / District Commissioner")
+      : user?.role === "admin" && activeRole === "up_official"
+        ? L("ইউপি প্রশাসনিক কর্মকর্তা", "UP Administrative Officer")
+        : user?.role === "admin" && activeRole === "up_secretary"
+          ? L("ইউপি সচিব", "Union Parishad Secretary")
+          : matchingExecutivePosition
+            ? L(matchingExecutivePosition.bn, matchingExecutivePosition.en)
+            : null;
   const canSwitchUnion = user?.role === "admin" && demoMode;
   const stationUpazila = state.upazilas.find((item) => item.id === "manirampur") ?? state.upazilas.find((item) => item.id === user?.upazilaId);
   const stationOptions = stationUpazila ? getStationsForUpazila(stationUpazila.id, stationUpazila.unions) : [];
+  const [avatar, setAvatar] = useState<{ userId: string; url: string } | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<{ userId: string; url: string } | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarUrl =
+    avatarPreview && avatarPreview.userId === user?.id
+      ? avatarPreview.url
+      : avatar && avatar.userId === user?.id
+        ? avatar.url
+        : null;
+  const userId = user?.id;
+
+  useEffect(() => {
+    if (!avatarPreview) return;
+    return () => URL.revokeObjectURL(avatarPreview.url);
+  }, [avatarPreview]);
+
+  useEffect(() => {
+    let active = true;
+    if (!authReady || !userId || demoMode || mfa !== "ok") return;
+
+    const loadAvatar = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        const authUser = data.session?.user;
+        const path = authUser?.user_metadata["avatar_path"];
+        if (
+          !active ||
+          authUser?.id !== userId ||
+          !isOwnProfileAvatarPath(path, userId)
+        ) {
+          return;
+        }
+
+        const { data: signedUrl, error: signedUrlError } = await supabase.storage
+          .from("profile-avatars")
+          .createSignedUrl(path, 60 * 60 * 24 * 7);
+        if (signedUrlError) throw signedUrlError;
+        if (active) setAvatar({ userId, url: signedUrl.signedUrl });
+      } catch (cause) {
+        console.error("Failed to load profile avatar", cause);
+        if (active) {
+          toast.error(L("প্রোফাইল ছবি লোড করা যায়নি", "Could not load profile photo"));
+        }
+      }
+    };
+
+    void loadAvatar();
+    return () => {
+      active = false;
+    };
+  }, [L, authReady, demoMode, mfa, userId]);
+
+  const handleAvatarFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file || !user) return;
+
+    const fileExtensions: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+    };
+    const extension = fileExtensions[file.type];
+    if (!extension) {
+      toast.error(L("শুধু JPG, PNG বা WebP ছবি ব্যবহার করুন", "Choose a JPG, PNG, or WebP image"));
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error(L("ছবির আকার সর্বোচ্চ ২০ MB হতে পারে", "The source image must be 20 MB or smaller"));
+      return;
+    }
+    if (demoMode || !authReady || mfa !== "ok") {
+      toast.error(
+        demoMode
+          ? L("লোকাল ডেমো অ্যাকাউন্টে ছবি সংরক্ষণ করা যায় না", "Photo uploads are unavailable in demo mode")
+          : L("নিরাপত্তা যাচাই সম্পন্ন করে আবার চেষ্টা করুন", "Complete security verification and try again"),
+      );
+      return;
+    }
+
+    setAvatarUploading(true);
+    const avatarStorage = supabase.storage.from("profile-avatars");
+    let uploadedPath: string | null = null;
+    let previousPath: unknown;
+    let stage: AvatarUploadStage = "compression";
+    try {
+      const previewUrl = URL.createObjectURL(file);
+      setAvatarPreview({ userId: user.id, url: previewUrl });
+
+      let compressedFile: File;
+      try {
+        compressedFile = await compressImage(file);
+      } catch (compressionCause) {
+        if (file.size > 2 * 1024 * 1024) throw compressionCause;
+        console.warn("Profile photo compression failed; trying the original within the bucket limit", compressionCause);
+        compressedFile = file;
+      }
+      const compressedExtension = fileExtensions[compressedFile.type];
+      if (!compressedExtension) {
+        throw new Error("Compressed profile photo has an unsupported file type");
+      }
+
+      stage = "auth_session";
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      const authUser = sessionData.session?.user;
+      if (!authUser || authUser.id !== user.id) {
+        throw new Error("The authenticated account changed before the photo upload");
+      }
+
+      const path = `${user.id}/${crypto.randomUUID()}.${compressedExtension}`;
+      stage = "storage_upload";
+      const { data: uploadedObject, error: uploadError } = await avatarStorage.upload(
+        path,
+        compressedFile,
+        {
+        cacheControl: "3600",
+        contentType: compressedFile.type,
+        },
+      );
+      if (uploadError) throw uploadError;
+      if (uploadedObject?.path !== path) {
+        throw new Error("Supabase did not confirm the uploaded profile photo path");
+      }
+      uploadedPath = path;
+
+      stage = "signed_url";
+      const { data: signedUrl, error: signedUrlError } = await avatarStorage.createSignedUrl(
+        path,
+        60 * 60 * 24 * 7,
+      );
+      if (signedUrlError) throw signedUrlError;
+      if (!signedUrl?.signedUrl) {
+        throw new Error("Supabase did not return a signed profile photo URL");
+      }
+
+      stage = "auth_session";
+      const { data: currentSessionData, error: currentSessionError } =
+        await supabase.auth.getSession();
+      if (currentSessionError) throw currentSessionError;
+      const currentAuthUser = currentSessionData.session?.user;
+      if (!currentAuthUser || currentAuthUser.id !== user.id) {
+        throw new Error("The authenticated account changed before saving the photo");
+      }
+      previousPath = currentAuthUser.user_metadata["avatar_path"];
+      stage = "metadata_update";
+      const { data: updatedAuthUser, error: updateError } = await supabase.auth.updateUser({
+        data: { ...currentAuthUser.user_metadata, avatar_path: path },
+      });
+      if (updateError) throw updateError;
+      if (
+        updatedAuthUser.user?.id !== user.id ||
+        updatedAuthUser.user.user_metadata["avatar_path"] !== path
+      ) {
+        throw new Error("Supabase did not confirm the profile photo metadata update");
+      }
+
+      uploadedPath = null;
+      setAvatar({ userId: user.id, url: signedUrl.signedUrl });
+      setAvatarPreview(null);
+      toast.success(L("প্রোফাইল ছবি আপডেট হয়েছে", "Profile photo updated"), {
+        description:
+          compressedFile.size < file.size
+            ? L("ছবিটি ছোট করে সংরক্ষণ করা হয়েছে", "The photo was compressed before saving")
+            : undefined,
+      });
+
+      if (isOwnProfileAvatarPath(previousPath, user.id) && previousPath !== path) {
+        try {
+          const { error: removeError } = await avatarStorage.remove([previousPath]);
+          if (removeError) console.error("Failed to remove previous profile avatar", removeError);
+        } catch (cause) {
+          console.error("Failed to remove previous profile avatar", cause);
+        }
+      }
+    } catch (cause) {
+      if (uploadedPath) {
+        try {
+          const { error: cleanupError } = await avatarStorage.remove([uploadedPath]);
+          if (cleanupError) {
+            console.error("Failed to clean up incomplete profile avatar", cleanupError);
+          }
+        } catch (cleanupCause) {
+          console.error("Failed to clean up incomplete profile avatar", cleanupCause);
+        }
+      }
+      setAvatarPreview(null);
+      console.error(
+        "Failed to upload profile avatar",
+        {
+          stage,
+          code: getErrorField(cause, "code"),
+          status: getErrorField(cause, "statusCode") ?? getErrorField(cause, "status"),
+          message: cause instanceof Error ? cause.message : getErrorField(cause, "message"),
+        },
+        cause,
+      );
+      toast.error(L("প্রোফাইল ছবি আপলোড করা যায়নি", "Could not upload profile photo"), {
+        description: getAvatarUploadFailure(cause, stage, L),
+        duration: 10_000,
+      });
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
 
   useEffect(() => {
     if (selectedPreviewRole) {
@@ -377,23 +722,110 @@ export function Header() {
         <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0 bg-white/10 text-white transition hover:bg-violet-300/25 hover:text-violet-50 max-[400px]:h-9 max-[400px]:w-9" onClick={() => setDlg("manual")} aria-label="Manual"><BookOpen className="h-6 w-6 max-[400px]:h-5 max-[400px]:w-5" /></Button>
         <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0 bg-white/10 text-white transition hover:bg-cyan-300/25 hover:text-cyan-50 max-[400px]:h-9 max-[400px]:w-9" onClick={() => setDlg("support")} aria-label="Support"><Headphones className="h-6 w-6 max-[400px]:h-5 max-[400px]:w-5" /></Button>
         {user ? (
-          <DropdownMenu>
+          <>
+            <input
+              id="profile-avatar-file"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="sr-only"
+              onChange={(event) => void handleAvatarFileChange(event)}
+              tabIndex={-1}
+              aria-label={L("প্রোফাইল ছবি নির্বাচন করুন", "Choose a profile photo")}
+            />
+            <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-11 max-w-40 shrink-0 truncate border-white/50 bg-emerald-800/60 px-3 text-sm font-semibold text-white hover:bg-emerald-900 hover:text-white sm:px-4">{L(user.name.bn, user.name.en)}</Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-11 max-w-40 shrink-0 gap-2 border-white/50 bg-emerald-800/60 px-2 text-base font-semibold text-white hover:bg-emerald-900 hover:text-white sm:px-3"
+              >
+                <Avatar className="h-8 w-8 border border-white/50">
+                  <AvatarImage src={avatarUrl ?? undefined} alt="" />
+                  <AvatarFallback className="bg-emerald-950 text-white">
+                    <UserRound className="h-4 w-4" aria-hidden="true" />
+                  </AvatarFallback>
+                </Avatar>
+                <span className="min-w-0 truncate">{L(user.name.bn, user.name.en)}</span>
+                <ChevronDown className="h-4 w-4 shrink-0 opacity-80" aria-hidden="true" />
+              </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>
-                <div>{L(user.name.bn, user.name.en)}</div>
-                <div className="text-xs font-normal text-muted-foreground">{roleLabel(user.role, L)}</div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => nav({ to: "/dashboard" })}>{L("ড্যাশবোর্ড", "Dashboard")}</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => nav({ to: "/security" })}>{L("নিরাপত্তা ও সেশন", "Security & sessions")}</DropdownMenuItem>
-              <DropdownMenuItem onClick={async () => { await logout(); nav({ to: "/", replace: true }); }}>
-                <LogOut className="mr-2 h-4 w-4" />{L("লগআউট", "Logout")}
+            <DropdownMenuContent
+              align="end"
+              sideOffset={10}
+              className="w-72 rounded-2xl border-emerald-100 bg-white p-2 text-base shadow-xl"
+            >
+              <div className="flex items-center gap-3 rounded-xl bg-emerald-50 p-3">
+                <Avatar className="h-14 w-14 border-2 border-white shadow-sm">
+                  <AvatarImage src={avatarUrl ?? undefined} alt="" />
+                  <AvatarFallback className="bg-emerald-800 text-white">
+                    <UserRound className="h-7 w-7" aria-hidden="true" />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <div className="truncate text-base font-bold text-emerald-950">
+                    {L(user.name.bn, user.name.en)}
+                  </div>
+                  <div className="mt-1 text-base font-medium text-emerald-800">
+                    {profileRoleTitle}
+                  </div>
+                  {activeProfilePositionTitle &&
+                    activeProfilePositionTitle !== profileRoleTitle && (
+                      <div className="mt-1 text-base text-emerald-700">
+                        {activeProfilePositionTitle}
+                      </div>
+                    )}
+                </div>
+              </div>
+              <DropdownMenuItem
+                asChild
+                disabled={avatarUploading || demoMode || !authReady || mfa !== "ok"}
+                onSelect={(event) => {
+                  event.preventDefault();
+                }}
+                className="mt-2 min-h-11 rounded-xl px-3 text-base font-semibold text-emerald-900 hover:bg-emerald-50 hover:text-emerald-950 focus:bg-emerald-50 focus:text-emerald-950"
+              >
+                <label
+                  htmlFor="profile-avatar-file"
+                  className="flex min-h-11 w-full cursor-pointer items-center gap-2"
+                >
+                  {avatarUploading ? (
+                    <LoaderCircle className="h-5 w-5 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Camera className="h-5 w-5" aria-hidden="true" />
+                  )}
+                  {avatarUploading
+                    ? L("ছবি আপলোড হচ্ছে…", "Uploading photo…")
+                    : L("ছবি পরিবর্তন / আপলোড করুন", "Change / upload photo")}
+                </label>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="my-2" />
+              <DropdownMenuItem
+                onSelect={() => void nav({ to: "/dashboard" })}
+                className="min-h-11 rounded-xl px-3 text-base hover:bg-emerald-50 hover:text-emerald-950 focus:bg-emerald-50 focus:text-emerald-950"
+              >
+                <LayoutDashboard className="h-5 w-5 text-emerald-700" aria-hidden="true" />
+                {L("ড্যাশবোর্ড", "Dashboard")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => void nav({ to: "/security" })}
+                className="min-h-11 rounded-xl px-3 text-base hover:bg-emerald-50 hover:text-emerald-950 focus:bg-emerald-50 focus:text-emerald-950"
+              >
+                <ShieldCheck className="h-5 w-5 text-emerald-700" aria-hidden="true" />
+                {L("নিরাপত্তা ও সেশন", "Security & sessions")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={async () => {
+                  await logout();
+                  await nav({ to: "/", replace: true });
+                }}
+                className="min-h-11 rounded-xl px-3 text-base text-red-700 hover:bg-red-50 hover:text-red-800 focus:bg-red-50 focus:text-red-800"
+              >
+                <LogOut className="h-5 w-5" aria-hidden="true" />
+                {L("লগআউট", "Logout")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </>
         ) : demoLoginAvailable ? (
           <span className="rounded-full border border-white/40 bg-emerald-700/35 px-2 py-1 text-[10px] font-semibold text-white sm:px-3 sm:text-xs">
             {L("লোকাল টেস্ট মোড", "Local test mode")}
@@ -412,7 +844,7 @@ export function Header() {
 export function RoleSwitcherBar() {
   const { user, L, demoLoginAvailable, enterDemoLogin } = useApp();
   const nav = useNavigate();
-  if (!demoLoginAvailable) return null;
+  if (!demoLoginAvailable || user?.role === "super") return null;
 
   const roles = [
     ["worker", "স্বাস্থ্যকর্মী", "Health Worker"],
@@ -459,14 +891,18 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
   const [mobile, setMobile] = useState("");
   const [otp, setOtp] = useState("");
   const [sent, setSent] = useState(false);
-  const [loginMessage, setLoginMessage] = useState<"pending" | "rejected" | null>(null);
+  const [loginMessage, setLoginMessage] = useState<
+    "pending" | "suspended" | "cancelled" | null
+  >(null);
   const [busy, setBusy] = useState(false);
 
   const fail = (r: { error?: string; lockedMinutes?: number }) => {
     if (r.error === "pending") {
       setLoginMessage("pending");
-    } else if (r.error === "rejected") {
-      setLoginMessage("rejected");
+    } else if (r.error === "suspended") {
+      setLoginMessage("suspended");
+    } else if (r.error === "cancelled" || r.error === "rejected") {
+      setLoginMessage("cancelled");
     } else if (r.error === "locked" || r.error === "too_many") {
       toast.error(
         L(
@@ -584,10 +1020,12 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
             >
               {loginMessage === "pending"
                 ? L(
-                    "Waiting for Approval — আপনার অ্যাকাউন্ট অনুমোদনের অপেক্ষায় আছে।",
-                    "Waiting for Approval — your account is awaiting review.",
+                    "আপনার আবেদন অনুমোদনের অপেক্ষায় আছে। অনুমোদন না হওয়া পর্যন্ত প্যানেলে প্রবেশ করা যাবে না।",
+                    "Your application is awaiting approval. Panel access is unavailable until it is approved.",
                   )
-                : L("আপনার নিবন্ধন অনুমোদিত হয়নি।", "Your registration was not approved.")}
+                : loginMessage === "suspended"
+                  ? L("আপনার অ্যাকাউন্ট সাময়িকভাবে স্থগিত।", "Your account is currently suspended.")
+                  : L("আপনার অ্যাকাউন্ট বাতিল করা হয়েছে।", "Your account has been cancelled.")}
             </div>
           )}
           <TabsContent value="login" className="pt-2">

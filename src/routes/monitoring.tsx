@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { DashboardGate } from "@/components/dashboards/DashboardGate";
+import { SuperAdminShell } from "@/components/dashboards/SuperAdminShell";
 import { MonitoringWorkspace } from "@/components/dashboards/MonitoringWorkspace";
 import { useApp } from "@/lib/store";
 
@@ -18,7 +19,11 @@ function MonitoringRoute() {
   const canMonitor = user && ["uno", "district", "super"].includes(user.role);
   return (
     <DashboardGate fitViewport flushViewport workerLayout={false} developmentPreviewRole="uno">
-      {canMonitor ? (
+      {canMonitor && user?.role === "super" ? (
+        <SuperAdminShell fullHeight>
+          <MonitoringWorkspace />
+        </SuperAdminShell>
+      ) : canMonitor ? (
         <MonitoringWorkspace />
       ) : (
         <main className="mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8">

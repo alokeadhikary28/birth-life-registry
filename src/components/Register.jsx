@@ -126,8 +126,8 @@ export default function Register() {
       setMessage({
         type: "success",
         text: L(
-          "আপনার অনুরোধ সুপার অ্যাডমিনের কাছে জমা হয়েছে। অনুমোদনের পর ইমেইলে পাসওয়ার্ড সেট করার লিংক পাবেন।",
-          "Your request was submitted to the Super Admin. After approval, you’ll receive an email link to set your password.",
+          "আপনার আবেদন পেন্ডিং অবস্থায় সুপার অ্যাডমিনের কাছে জমা হয়েছে। অনুমোদনের আগে কোনো অ্যাকাউন্ট বা কাজের প্যানেলে প্রবেশাধিকার থাকবে না; অনুমোদনের পর ইমেইলে পাসওয়ার্ড সেট করার লিংক পাবেন।",
+          "Your application is pending with the Super Admin. No account or work-panel access is available before approval; after approval, you’ll receive an email link to set your password.",
         ),
       });
     } catch (error) {

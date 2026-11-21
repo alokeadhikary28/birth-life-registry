@@ -281,6 +281,34 @@
       "when": 1794000300000,
       "tag": "0039_registration_executive_positions",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1795270000000,
+      "tag": "0041_profile_avatars",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1795270001000,
+      "tag": "0042_super_only_staff_approval",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1795270002000,
+      "tag": "0043_profile_executive_position",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1795270003000,
+      "tag": "0044_super_admin_user_management",
+      "breakpoints": true
     }
   ]
 }

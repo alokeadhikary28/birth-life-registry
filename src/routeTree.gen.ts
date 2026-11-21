@@ -26,6 +26,7 @@ import { Route as SetupRouteImport } from './routes/setup'
 import { Route as UnionMasterRouteImport } from './routes/union-master'
 import { Route as DashboardSectionRouteImport } from './routes/dashboard.$section'
 import { Route as MonitoringUnionDetailsRouteImport } from './routes/monitoring_.union-details'
+import { Route as SuperAdminActionRouteImport } from './routes/super-admin.$action'
 import { Route as WorkerApplicationsTypeRouteImport } from './routes/worker-applications.$type'
 import { Route as Worker_applicationsTypeRouteImport } from './routes/worker_applications.$type'
 
@@ -114,6 +115,11 @@ const MonitoringUnionDetailsRoute = MonitoringUnionDetailsRouteImport.update({
   path: '/monitoring/union-details',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SuperAdminActionRoute = SuperAdminActionRouteImport.update({
+  id: '/super-admin/$action',
+  path: '/super-admin/$action',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WorkerApplicationsTypeRoute = WorkerApplicationsTypeRouteImport.update({
   id: '/worker-applications/$type',
   path: '/worker-applications/$type',
@@ -143,6 +149,7 @@ export interface FileRoutesByFullPath {
   '/union-master': typeof UnionMasterRoute
   '/dashboard/$section': typeof DashboardSectionRoute
   '/monitoring/union-details': typeof MonitoringUnionDetailsRoute
+  '/super-admin/$action': typeof SuperAdminActionRoute
   '/worker-applications/$type': typeof WorkerApplicationsTypeRoute
   '/worker_applications/$type': typeof Worker_applicationsTypeRoute
 }
@@ -164,6 +171,7 @@ export interface FileRoutesByTo {
   '/union-master': typeof UnionMasterRoute
   '/dashboard/$section': typeof DashboardSectionRoute
   '/monitoring/union-details': typeof MonitoringUnionDetailsRoute
+  '/super-admin/$action': typeof SuperAdminActionRoute
   '/worker-applications/$type': typeof WorkerApplicationsTypeRoute
   '/worker_applications/$type': typeof Worker_applicationsTypeRoute
 }
@@ -186,6 +194,7 @@ export interface FileRoutesById {
   '/union-master': typeof UnionMasterRoute
   '/dashboard/$section': typeof DashboardSectionRoute
   '/monitoring_/union-details': typeof MonitoringUnionDetailsRoute
+  '/super-admin/$action': typeof SuperAdminActionRoute
   '/worker-applications/$type': typeof WorkerApplicationsTypeRoute
   '/worker_applications/$type': typeof Worker_applicationsTypeRoute
 }
@@ -209,6 +218,7 @@ export interface FileRouteTypes {
     | '/union-master'
     | '/dashboard/$section'
     | '/monitoring/union-details'
+    | '/super-admin/$action'
     | '/worker-applications/$type'
     | '/worker_applications/$type'
   fileRoutesByTo: FileRoutesByTo
@@ -230,6 +240,7 @@ export interface FileRouteTypes {
     | '/union-master'
     | '/dashboard/$section'
     | '/monitoring/union-details'
+    | '/super-admin/$action'
     | '/worker-applications/$type'
     | '/worker_applications/$type'
   id:
@@ -251,6 +262,7 @@ export interface FileRouteTypes {
     | '/union-master'
     | '/dashboard/$section'
     | '/monitoring_/union-details'
+    | '/super-admin/$action'
     | '/worker-applications/$type'
     | '/worker_applications/$type'
   fileRoutesById: FileRoutesById
@@ -272,6 +284,7 @@ export interface RootRouteChildren {
   SetupRoute: typeof SetupRoute
   UnionMasterRoute: typeof UnionMasterRoute
   MonitoringUnionDetailsRoute: typeof MonitoringUnionDetailsRoute
+  SuperAdminActionRoute: typeof SuperAdminActionRoute
   WorkerApplicationsTypeRoute: typeof WorkerApplicationsTypeRoute
   Worker_applicationsTypeRoute: typeof Worker_applicationsTypeRoute
 }
@@ -397,6 +410,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MonitoringUnionDetailsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/super-admin/$action': {
+      id: '/super-admin/$action'
+      path: '/super-admin/$action'
+      fullPath: '/super-admin/$action'
+      preLoaderRoute: typeof SuperAdminActionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/worker-applications/$type': {
       id: '/worker-applications/$type'
       path: '/worker-applications/$type'
@@ -443,6 +463,7 @@ const rootRouteChildren: RootRouteChildren = {
   SetupRoute: SetupRoute,
   UnionMasterRoute: UnionMasterRoute,
   MonitoringUnionDetailsRoute: MonitoringUnionDetailsRoute,
+  SuperAdminActionRoute: SuperAdminActionRoute,
   WorkerApplicationsTypeRoute: WorkerApplicationsTypeRoute,
   Worker_applicationsTypeRoute: Worker_applicationsTypeRoute,
 }

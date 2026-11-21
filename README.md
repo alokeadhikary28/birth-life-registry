@@ -102,6 +102,12 @@ role/jurisdiction-scoped case policies, worker and police submission policies,
 and restrictive MFA policies for privileged roles. The app also requires a
 private `case-files` Storage bucket; existing Storage policies scope uploads by
 role and administrative area and reads to visible cases.
+Migration `0041_profile_avatars.sql` adds the private `profile-avatars` bucket
+and per-user Storage policies that also enforce the privileged-role MFA gate.
+Avatar object paths are saved in the Auth user's own metadata; apply this
+migration before enabling photo uploads. The header accepts JPG/PNG/WebP
+images up to 20 MB, compresses them to 750 KB when needed, and falls back to
+the original image only when it remains within the bucket's 2 MB limit.
 
 `supabase/registration-recovery.sql` is an idempotent SQL Editor bootstrap for
 the current Manirampur staff-registration and approval flow only. It creates
@@ -117,10 +123,22 @@ For older `upazilas` tables with `name`/`district_name`, it preserves those
 columns, adds the bilingual fields expected by the app, and backfills them
 without requiring the newer columns to exist beforehand.
 
+`supabase/dashboard-data-recovery.sql` is a transactional, idempotent recovery
+script for a partially bootstrapped project where `cases`, `case_remarks`, and
+`upazila_announcements` are absent. It checks the existing profile, role, area,
+station, audit, and `app_role` prerequisites; then creates those dashboard
+relations, the `case_history` RPC, scoped RLS, and the MFA gates. It does not
+advance Drizzle's migration ledger or replace the full migration history, and
+it does not apply migrations omitted from that ledger, create the Storage
+bucket/policies, or create other feature tables. In particular, it does not
+apply the unjournaled `0040_case_field_visit_workflow.sql`; reconcile that
+workflow separately if it has already been deployed or is needed by the app.
+Review the target project's migration state before running the helper.
+
 Before applying the full migration history to a connected project, reconcile
-migration status: `drizzle/migrations/meta/_journal.json` currently ends at
-`0039`, while `0040_case_field_visit_workflow.sql` is present but absent from
-that journal. Confirm which SQL has already been applied in the target database
-first; do not blindly run the migration directory against production. Live RLS
-and Storage behavior must be verified against the connected Supabase project
-after its deployment secrets and migration history are confirmed.
+migration status: the journal now includes `0041_profile_avatars`, but
+`0040_case_field_visit_workflow.sql` remains present without a journal entry.
+Confirm which SQL has already been applied in the target database first; do not
+blindly run the migration directory against production. Live RLS and Storage
+behavior must be verified against the connected Supabase project after its
+deployment secrets and migration history are confirmed.

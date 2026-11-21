@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { DashboardGate } from "@/components/dashboards/DashboardGate";
+import { SuperAdminShell } from "@/components/dashboards/SuperAdminShell";
 import { ModuleNavigation } from "@/components/modules/ModuleNavigation";
 import { CorrectionLogPage } from "@/components/modules/CorrectionLogPage";
 import { useApp } from "@/lib/store";
@@ -17,9 +18,11 @@ export const Route = createFileRoute("/correction-log")({
 function CorrectionRoute() {
   const { L, user } = useApp();
   return (
-    <DashboardGate>
+    <DashboardGate flushViewport={user?.role === "super"}>
       {user?.role === "super" ? (
-        <CorrectionLogPage />
+        <SuperAdminShell>
+          <CorrectionLogPage />
+        </SuperAdminShell>
       ) : (
         <main className="mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8">
           <ModuleNavigation />

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MonitoringTargetEntry } from "@/components/dashboards/MonitoringTargetEntry";
+import { MonitoringTargetOverview } from "@/components/dashboards/MonitoringTargetOverview";
 import { MonitoringNoticeBoard } from "@/components/dashboards/MonitoringNoticeBoard";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
@@ -101,6 +102,8 @@ export function MonitoringWorkspace() {
   const [renamingPageId, setRenamingPageId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [loading, setLoading] = useState(true);
+  const [pagesLoadError, setPagesLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -119,6 +122,7 @@ export function MonitoringWorkspace() {
       setPages([noticePage]);
       setActivePageId(noticePage.id);
       setDirtyPageIds([]);
+      setPagesLoadError(false);
       setLoading(false);
       return;
     }
@@ -128,12 +132,14 @@ export function MonitoringWorkspace() {
       setPages(demoPages);
       setActivePageId(demoPages.find((page) => page.pageNumber === 1)?.id ?? null);
       setDirtyPageIds([]);
+      setPagesLoadError(false);
       setLoading(false);
       return;
     }
 
     let active = true;
     setLoading(true);
+    setPagesLoadError(false);
 
     void (async () => {
       const { data, error } = await supabase
@@ -146,6 +152,9 @@ export function MonitoringWorkspace() {
       if (error) {
         console.error("Failed to load monitoring entry pages", error);
         toast.error(L("ডেটা এন্ট্রি পৃষ্ঠা লোড করা যায়নি", "Could not load data entry pages"));
+        setPages([]);
+        setActivePageId(null);
+        setPagesLoadError(true);
       } else {
         const existingPages = (data ?? []) as PageRecord[];
         const existingNumbers = new Set(existingPages.map((page) => page.page_number));
@@ -165,6 +174,7 @@ export function MonitoringWorkspace() {
           if (seedError) {
             console.error("Failed to prepare default monitoring pages", seedError);
             toast.error(L("প্রাথমিক পৃষ্ঠা তৈরি করা যায়নি", "Could not prepare default pages"));
+            setPagesLoadError(true);
           }
         }
         const { data: refreshedData, error: refreshError } = missingDefaults.length
@@ -177,11 +187,12 @@ export function MonitoringWorkspace() {
         if (refreshError) {
           console.error("Failed to reload default monitoring pages", refreshError);
           toast.error(L("ডেটা এন্ট্রি পৃষ্ঠা লোড করা যায়নি", "Could not load data entry pages"));
+          setPagesLoadError(true);
         }
-        const loadedPages = ((refreshedData ?? []) as PageRecord[]).map((page) => ({
+        const loadedPages = ((refreshedData ?? existingPages) as PageRecord[]).map((page) => ({
           id: page.id,
           pageNumber: page.page_number,
-           pageType: parsePageType(page.page_type),
+          pageType: parsePageType(page.page_type),
           title: page.title,
           entries: parseEntries(page.entries),
         }));
@@ -196,7 +207,7 @@ export function MonitoringWorkspace() {
     return () => {
       active = false;
     };
-  }, [L, canManagePages, demoMode, user]);
+  }, [L, canManagePages, demoMode, reloadKey, user]);
 
   const activePage = pages.find((page) => page.id === activePageId) ?? null;
 
@@ -363,7 +374,33 @@ export function MonitoringWorkspace() {
   };
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-1 flex-col">
+    <div
+      className={`flex h-full min-h-0 w-full flex-1 flex-col ${
+        user?.role === "super" ? "super-admin-monitoring" : ""
+      }`}
+    >
+      {pagesLoadError && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 sm:px-5"
+        >
+          <p className="text-sm leading-6">
+            {L(
+              "পর্যবেক্ষণ পৃষ্ঠা লোড/প্রস্তুত করা যায়নি। MFA সেশন, RLS এবং 0019–0020 migration যাচাই করুন।",
+              "Monitoring pages could not be loaded or prepared. Verify the MFA session, RLS, and migrations 0019–0020.",
+            )}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10 text-base"
+            disabled={loading}
+            onClick={() => setReloadKey((key) => key + 1)}
+          >
+            {L("আবার চেষ্টা করুন", "Retry")}
+          </Button>
+        </div>
+      )}
       <div className={`grid min-h-0 flex-1 grid-cols-1 overflow-hidden bg-white transition-[grid-template-columns] duration-200 ease-out motion-reduce:transition-none dark:bg-slate-900 ${sidebarCollapsed ? "md:grid-cols-[4rem_minmax(0,1fr)]" : "md:grid-cols-[16rem_minmax(0,1fr)]"}`}>
         <aside className={`flex min-h-0 flex-col border-b border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-950/30 md:border-b-0 md:border-r ${sidebarCollapsed ? "md:w-auto" : "md:w-64"}`}>
           <div className={`flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-3 dark:border-slate-700 ${sidebarCollapsed ? "md:flex-col md:px-2" : ""}`}>
@@ -463,7 +500,11 @@ export function MonitoringWorkspace() {
                 <MonitoringNoticeBoard />
               ) : activePage.pageType === "targets" ? (
                 <div className="min-h-0 flex-1 overflow-auto">
-                  <MonitoringTargetEntry />
+                  {user?.role === "uno" ? (
+                    <MonitoringTargetEntry />
+                  ) : (
+                    <MonitoringTargetOverview />
+                  )}
                 </div>
               ) : (
               <div className="flex-1 overflow-auto p-4 sm:p-5">
